@@ -5,17 +5,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.indhg.aiforcoyote.data.Settings
 import com.indhg.aiforcoyote.data.SettingsRepository
-import com.indhg.aiforcoyote.game.NoopDevice
+import com.indhg.aiforcoyote.game.RelayDevice
 import com.indhg.aiforcoyote.game.Safety
 import com.indhg.aiforcoyote.game.parseAction
 import com.indhg.aiforcoyote.llm.DeepSeekClient
 import com.indhg.aiforcoyote.llm.SystemPrompt
+import com.indhg.aiforcoyote.relay.CoyoteController
+import com.indhg.aiforcoyote.relay.RelayState
+import com.indhg.aiforcoyote.relay.V4RelayServer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** 聊天消息（UI 层）。 */
@@ -25,8 +27,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = SettingsRepository(app)
     private val client = DeepSeekClient()
-    private val device = NoopDevice() // M1 换中继实现
+
+    private val relayServer = V4RelayServer()
+    private var safetyRef: Safety? = null
+    private val controller = CoyoteController(onDisconnect = { viewModelScope.launch { safetyRef?.reset() } })
+    private val device = RelayDevice(app, controller, viewModelScope)
     private val safety = Safety(device)
+
+    val relayState: StateFlow<RelayState> = controller.state
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -44,6 +52,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val history = mutableListOf<Pair<String, String>>()
     private var loopJob: Job? = null
+    private var resendJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -54,6 +63,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch { restartLoop() }
+
+        // M1：内嵌中继 + 控制方客户端 + 波形循环 30s 重发
+        safetyRef = safety
+        relayServer.startRelay()
+        controller.connectLoop()
+        resendJob = viewModelScope.launch {
+            while (true) {
+                delay(30_000L)
+                if (device.needsLoopResend()) device.resendLoop()
+            }
+        }
     }
 
     fun clearToast() {

@@ -62,10 +62,18 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val busy by vm.busy.collectAsState()
     val settings by vm.settings.collectAsState()
     val strengths by vm.strengths.collectAsState()
+    val relay by vm.relayState.collectAsState()
     val toast by vm.toast.collectAsState()
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
     var input by remember { mutableStateOf("") }
+
+    val pairLabel = when (relay.status) {
+        "paired" -> "郊狼已配对"
+        "waiting" -> "等待郊狼扫码"
+        "connecting" -> "中继连接中…"
+        else -> "中继未连接"
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -111,6 +119,12 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             Text("A ${strengths["A"] ?: 0}", fontSize = 13.sp, color = Gold)
             Spacer(Modifier.width(12.dp))
             Text("B ${strengths["B"] ?: 0}", fontSize = 13.sp, color = Muted)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                pairLabel,
+                fontSize = 12.sp,
+                color = if (relay.status == "paired") Gold else Muted,
+            )
             Spacer(Modifier.weight(1f))
             Text("自动运行", fontSize = 12.sp, color = Muted)
             Spacer(Modifier.width(4.dp))

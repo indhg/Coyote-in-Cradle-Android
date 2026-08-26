@@ -1,5 +1,6 @@
 package com.indhg.aiforcoyote.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -30,11 +32,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.indhg.aiforcoyote.MainViewModel
+import com.indhg.aiforcoyote.qr.QrCode
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
 import com.indhg.aiforcoyote.ui.theme.Ink
@@ -130,6 +134,9 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(4.dp))
+        Text("配对郊狼", fontSize = 13.sp, color = Muted)
+        PairSection(vm)
+
         Text("角色设置", fontSize = 13.sp, color = Muted)
         OutlinedTextField(
             value = nick,
@@ -162,6 +169,36 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             lineHeight = 16.sp,
             color = Faint,
         )
+    }
+}
+
+@Composable
+private fun PairSection(vm: MainViewModel) {
+    val relay by vm.relayState.collectAsState()
+    when (relay.status) {
+        "paired" -> Text(
+            "已配对 · slotId ${relay.slotId ?: "—"}",
+            fontSize = 12.sp,
+            color = Gold,
+        )
+        "waiting" -> {
+            Text("用 DG-LAB 4.0 App 扫码配对（同一台手机）", fontSize = 12.sp, color = Muted)
+            Spacer(Modifier.height(8.dp))
+            val bmp = remember(relay.pairUrl) {
+                if (relay.pairUrl.isNotEmpty()) QrCode.bitmap(relay.pairUrl) else null
+            }
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = "配对二维码",
+                    modifier = Modifier.size(200.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(relay.pairUrl, fontSize = 10.sp, color = Faint, maxLines = 3)
+        }
+        "connecting" -> Text("中继连接中…", fontSize = 12.sp, color = Muted)
+        else -> Text("中继未连接（杀掉应用重开重试）", fontSize = 12.sp, color = Faint)
     }
 }
 

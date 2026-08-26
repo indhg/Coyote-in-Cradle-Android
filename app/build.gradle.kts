@@ -48,4 +48,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("com.google.zxing:core:3.5.3")
 }

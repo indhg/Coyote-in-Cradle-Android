@@ -40,6 +40,8 @@ class CoyoteController(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val relayPort: Int = URI(url).port.let { if (it > 0) it else 9998 }
+
     private val _state = MutableStateFlow(RelayState())
     val state: StateFlow<RelayState> = _state.asStateFlow()
 
@@ -114,11 +116,13 @@ class CoyoteController(
             "hello" -> {
                 val cid = frame["clientId"]?.jsonPrimitive?.contentOrNull ?: return
                 Log.i(TAG, "拿到控制方 ID: $cid")
+                // 用手机局域网 IP 生成配对地址（郊狼 App 可能拒绝 127.0.0.1）
+                val host = com.indhg.aiforcoyote.util.LanIp.get()
                 setState(
                     _state.value.copy(
                         status = "waiting",
                         controllerId = cid,
-                        pairUrl = "https://dungeon-lab.cn/s/?v=1&action=socket&url=$url?tid=$cid",
+                        pairUrl = "https://dungeon-lab.cn/s/?v=1&action=socket&url=ws://$host:$relayPort?tid=$cid",
                     )
                 )
             }

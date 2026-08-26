@@ -30,7 +30,7 @@ import kotlinx.serialization.json.put
  * - 被控方上行转发给控制方为 {"type":"message","clientId":被控方,"data":...}
  * - 业务心跳 30s 广播 + 原生 ping 10s（3 次未响应踢除）+ 控制方空闲 5 分钟关闭
  */
-class V4RelayServer(private val port: Int = 9998) : WebSocketServer(InetSocketAddress("127.0.0.1", port)) {
+class V4RelayServer(private val port: Int = 9998) : WebSocketServer(InetSocketAddress(port)) {
 
     private val wsToClientId = ConcurrentHashMap<WebSocket, String>()
     private val controllersById = ConcurrentHashMap<String, WebSocket>()

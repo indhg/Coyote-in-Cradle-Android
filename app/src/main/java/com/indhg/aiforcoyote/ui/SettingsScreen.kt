@@ -169,6 +169,11 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             lineHeight = 16.sp,
             color = Faint,
         )
+        Text(
+            "AI for Coyote v${com.indhg.aiforcoyote.BuildConfig.VERSION_NAME}（build ${com.indhg.aiforcoyote.BuildConfig.VERSION_CODE}）",
+            fontSize = 11.sp,
+            color = Faint,
+        )
     }
 }
 
@@ -196,6 +201,13 @@ private fun PairSection(vm: MainViewModel) {
             }
             Spacer(Modifier.height(4.dp))
             Text(relay.pairUrl, fontSize = 10.sp, color = Faint, maxLines = 3)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "若扫码失败：① 郊狼 App 内用「Socket V4」入口扫；② 确认两个 App 都在本机且郊狼 App 已更新；③ 仍失败把报错发我。",
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                color = Faint,
+            )
         }
         "connecting" -> Text("中继连接中…", fontSize = 12.sp, color = Muted)
         else -> Text("中继未连接（杀掉应用重开重试）", fontSize = 12.sp, color = Faint)

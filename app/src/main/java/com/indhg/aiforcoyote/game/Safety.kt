@@ -69,8 +69,16 @@ class Safety(private val device: DeviceOps) {
                     executed += Executed("$ch 强度 $clamped")
                 }
                 "add_strength" -> {
-                    val ch = a.channel ?: run { dropped += Dropped("缺少通道"); continue }
-                    val delta = a.value ?: run { dropped += Dropped("缺少 delta"); continue }
+                    val ch = a.channel
+                    if (ch == null) {
+                        dropped += Dropped("缺少通道")
+                        continue
+                    }
+                    val delta = a.value
+                    if (delta == null) {
+                        dropped += Dropped("缺少 delta")
+                        continue
+                    }
                     val cap = caps[ch] ?: 100
                     val cur = _strengths.value[ch] ?: 0
                     val clamped = max(0, min(cap, cur + delta))

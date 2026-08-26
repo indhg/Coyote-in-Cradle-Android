@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -109,22 +110,25 @@ class DeepSeekClient {
                 if (!resp.isSuccessful) {
                     val err = resp.body?.string()?.take(300) ?: ""
                     lastError = IOException("HTTP ${resp.code}: $err")
-                    continue
+                } else {
+                    val root = json.parseToJsonElement(resp.body!!.string()).jsonObject
+                    val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonObject
+                    if (message == null) {
+                        lastError = IOException("响应缺少 choices")
+                    } else {
+                        var content = message["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                        if (content.isBlank()) {
+                            content = message["reasoning_content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                        }
+                        if (content.isBlank()) {
+                            lastError = IOException("模型返回空内容")
+                        } else {
+                            val turn = parseTurn(content)
+                            if (turn != null) return@withContext turn
+                            lastError = IOException("无法解析 JSON 输出")
+                        }
+                    }
                 }
-                val root = json.parseToJsonElement(resp.body!!.string()).jsonObject
-                val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonObject
-                    ?: run { lastError = IOException("响应缺少 choices"); continue }
-                var content = message["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-                if (content.isBlank()) {
-                    content = message["reasoning_content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-                }
-                if (content.isBlank()) {
-                    lastError = IOException("模型返回空内容")
-                    continue
-                }
-                val turn = parseTurn(content)
-                if (turn != null) return@withContext turn
-                lastError = IOException("无法解析 JSON 输出")
             } catch (e: Exception) {
                 lastError = e
             }

@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+/** 版本号：阶段标注（如 0.1.0-m1.2），同时写进 APK 文件名 */
+val appVersion = "0.1.0-m1.2"
+
 android {
     namespace = "com.indhg.aiforcoyote"
     compileSdk = 35
@@ -14,7 +17,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1.0-m1.2"
+        versionName = appVersion
     }
 
     buildTypes {
@@ -33,6 +36,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// APK 文件名带版本号：AI-for-Coyote-<versionName>-<variant>.apk
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            (output as com.android.build.api.variant.impl.VariantOutputImpl)
+                .outputFileName.set("AI-for-Coyote-$appVersion-${variant.name}.apk")
+        }
     }
 }
 

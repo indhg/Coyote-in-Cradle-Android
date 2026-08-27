@@ -102,7 +102,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("AI for Coyote", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
+                Text("Coyote in Cradle", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
                 Text(
                     if (settings.profile == "纯爱") "纯爱版 · 温柔驯服" else "调教版 · 支配胁迫",
                     fontSize = 12.sp,

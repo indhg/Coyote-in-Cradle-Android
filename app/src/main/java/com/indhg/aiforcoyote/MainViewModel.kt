@@ -1,6 +1,7 @@
 package com.indhg.aiforcoyote
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
@@ -11,6 +12,7 @@ import com.indhg.aiforcoyote.game.AudioState
 import com.indhg.aiforcoyote.game.BleCoyote
 import com.indhg.aiforcoyote.game.CameraObserver
 import com.indhg.aiforcoyote.game.CameraState
+import com.indhg.aiforcoyote.game.DeviceAction
 import com.indhg.aiforcoyote.game.DeviceState
 import com.indhg.aiforcoyote.game.Safety
 import com.indhg.aiforcoyote.game.parseAction
@@ -44,6 +46,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val audioState: StateFlow<AudioState> = audio.state
     private val notes = mutableListOf<String>()
     private var rageRounds = 0
+
+    // M3：双通道保底（轮次计数 + 每通道最近一次强度/波形调整轮次）
+    private var turnCount = 0
+    private val lastStrength = mutableMapOf("A" to 0, "B" to 0)
+    private val lastWave = mutableMapOf("A" to 0, "B" to 0)
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -159,7 +166,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 notes = notes.toList(),
             )
             val result = client.chat(s.baseUrl, s.apiKey, s.model, system, history.toList(), img)
-            val (executed, dropped) = safety.apply(result.actions.map { parseAction(it) })
+            val actions = result.actions.map { parseAction(it) }
+            val (executed, dropped) = safety.apply(actions)
+            // M3：双通道保底——记录每通道最近调整轮次并自动修复
+            turnCount++
+            for (a in actions) {
+                when (a.op) {
+                    "hold_strength", "temp_strength", "add_strength" -> a.channel?.let { lastStrength[it] = turnCount }
+                    "pulse_hold", "pulse" -> a.channel?.let { lastWave[it] = turnCount }
+                }
+            }
+            applyChannelFloor()
             val note = buildString {
                 for (e in executed) append("▶ ").append(e.label).append("\n")
                 for (d in dropped) append("✖ ").append(d.reason).append("\n")
@@ -172,6 +189,44 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _messages.value = _messages.value + UiMsg("ai", "模型走神了……再发一次？", e.message ?: "")
         } finally {
             _busy.value = false
+        }
+    }
+
+    /**
+     * M3：双通道保底（复刻桌面 _apply_channel_floor）：
+     * 第 2 轮起两通道都必须有波形 + 非零强度（自动修复）；每 3 轮内强度与波形各调整一次。
+     */
+    private suspend fun applyChannelFloor() {
+        if (deviceState.value.status != "connected") return
+        for (ch in listOf("A", "B")) {
+            val base = if (ch == "A") 15 else 5
+            val waveActive = ble.waveActive(ch)
+            val strength = safety.strengths.value[ch] ?: 0
+            var fixed = false
+            if (turnCount >= 2) {
+                if (!waveActive) {
+                    safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)))
+                    lastWave[ch] = turnCount
+                    fixed = true
+                }
+                if (strength <= 0) {
+                    safety.apply(listOf(DeviceAction("hold_strength", ch, base, null, null)))
+                    lastStrength[ch] = turnCount
+                    fixed = true
+                }
+            }
+            if (turnCount - (lastStrength[ch] ?: 0) >= 3) {
+                val delta = if (strength < 100) 5 else -5
+                safety.apply(listOf(DeviceAction("add_strength", ch, delta, null, null)))
+                lastStrength[ch] = turnCount
+                fixed = true
+            }
+            if (turnCount - (lastWave[ch] ?: 0) >= 3) {
+                safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)))
+                lastWave[ch] = turnCount
+                fixed = true
+            }
+            if (fixed) Log.i(TAG, "通道保底：$ch 已自动补齐（第 $turnCount 轮）")
         }
     }
 
@@ -191,5 +246,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** 急停不做；复位供断开场景调用。 */
     fun resetDevice() {
         viewModelScope.launch { safety.reset() }
+    }
+
+    companion object {
+        private const val TAG = "MainVM"
+        private const val DEFAULT_WAVE = "呼吸"
     }
 }

@@ -173,7 +173,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             color = Faint,
         )
         Text(
-            "AI for Coyote v${com.indhg.aiforcoyote.BuildConfig.VERSION_NAME}（build ${com.indhg.aiforcoyote.BuildConfig.VERSION_CODE}）",
+            "Coyote in Cradle v${com.indhg.aiforcoyote.BuildConfig.VERSION_NAME}（build ${com.indhg.aiforcoyote.BuildConfig.VERSION_CODE}）",
             fontSize = 11.sp,
             color = Faint,
         )

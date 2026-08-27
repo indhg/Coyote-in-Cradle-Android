@@ -53,6 +53,7 @@ class BleCoyote(
         private const val DEVICE_NAME = "47L121000"
         private const val SCAN_TIMEOUT_MS = 15_000L
         private const val STREAM_INTERVAL_MS = 100L
+        private const val RECONNECT_DELAY_MS = 3_000L
         private val SERVICE = UUID.fromString("0000180C-0000-1000-8000-00805f9b34fb")
         private val WRITE_CHAR = UUID.fromString("0000150A-0000-1000-8000-00805f9b34fb")
         private val NOTIFY_CHAR = UUID.fromString("0000150B-0000-1000-8000-00805f9b34fb")
@@ -89,6 +90,9 @@ class BleCoyote(
     private var streaming = false
     private var scanCb: ScanCallback? = null
 
+    /** 用户/程序想保持连接（用户手动断开时置 false，停止自动重连）。 */
+    private var wantConnection = false
+
     /** 波形帧数据（assets/waveforms.json，与 RelayDevice 同源）。 */
     private val waveByName: Map<String, List<String>> by lazy {
         try {
@@ -113,6 +117,7 @@ class BleCoyote(
 
     // ---------- 连接 ----------
     fun connect() {
+        wantConnection = true
         if (_state.value.status == "scanning" || _state.value.status == "connecting") return
         val a = adapter ?: run {
             _state.value = _state.value.copy(error = "本机无蓝牙")
@@ -149,6 +154,7 @@ class BleCoyote(
     }
 
     fun disconnect() {
+        wantConnection = false
         stopScan()
         try {
             gatt?.disconnect()
@@ -262,6 +268,13 @@ class BleCoyote(
         closeGatt()
         _state.value = DeviceState("disconnected", battery = _state.value.battery)
         onDisconnect()
+        // 断线自动重连（用户主动断开时不重连）
+        if (wantConnection) {
+            scope.launch {
+                delay(RECONNECT_DELAY_MS)
+                if (wantConnection && _state.value.status == "disconnected") connect()
+            }
+        }
     }
 
     /** BF：软上限 200/200 + 频率平衡 200 + 强度平衡 200（对齐 Howl 默认）。 */
@@ -419,6 +432,14 @@ class BleCoyote(
     }
 
     override fun needsLoopResend(): Boolean = false // 流式循环天然维持，无需 30s 重发
+
+    /** 通道是否有活跃波形（双通道保底用）。 */
+    fun waveActive(ch: String): Boolean {
+        val c = channels[ch] ?: return false
+        if (c.frames.isEmpty()) return false
+        val now = System.currentTimeMillis()
+        return c.untilMs == 0L || now < c.untilMs
+    }
 
     /** 临时强度：时长到后归零（桌面语义）。 */
     private fun scheduleTempRevert(ch: String, durationS: Int) {

@@ -6,7 +6,7 @@ plugins {
 }
 
 /** 版本号：阶段标注（如 0.1.0-m1.2），同时写进 APK 文件名 */
-val appVersion = "0.1.0-m2.2"
+val appVersion = "0.1.0-m3.1"
 
 android {
     namespace = "com.indhg.aiforcoyote"
@@ -23,6 +23,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // 自用侧载：release 复用 debug 签名（换正式签名时在此处替换）
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -39,12 +41,12 @@ android {
     }
 }
 
-// APK 文件名带版本号：AI-for-Coyote-<versionName>-<variant>.apk
+// APK 文件名带版本号：Coyote-in-Cradle-<versionName>-<variant>.apk
 androidComponents {
     onVariants(selector().all()) { variant ->
         variant.outputs.forEach { output ->
             (output as com.android.build.api.variant.impl.VariantOutputImpl)
-                .outputFileName.set("AI-for-Coyote-$appVersion-${variant.name}.apk")
+                .outputFileName.set("Coyote-in-Cradle-$appVersion-${variant.name}.apk")
         }
     }
 }
@@ -62,8 +64,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("org.java-websocket:Java-WebSocket:1.5.7")
-    implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")

@@ -43,7 +43,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val cameraState: StateFlow<CameraState> = camera.state
     val audioState: StateFlow<AudioState> = audio.state
     private val notes = mutableListOf<String>()
-    private var dullRounds = 0
+    private var rageRounds = 0
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -144,18 +144,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _busy.value = false
                 return
             }
-            // M2：观察信号——呆滞轮数（画面黑暗 / 持续无声）+ 最新帧注入 + 呻吟反馈
+            // M2：观察信号——怒气值（画面黑暗 / 持续无声）+ 最新帧注入 + 呻吟反馈
             val cs = camera.state.value
             val asSt = audio.state.value
-            var dull = false
-            if (cs.enabled) dull = dull || (cs.hasFrame && cs.dark)
-            if (asSt.enabled) dull = dull || asSt.silent
-            if (dull) dullRounds++ else dullRounds = 0
+            var rage = false
+            if (cs.enabled) rage = rage || (cs.hasFrame && cs.dark)
+            if (asSt.enabled) rage = rage || asSt.silent
+            if (rage) rageRounds++ else rageRounds = 0
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
             val system = SystemPrompt.build(
                 getApplication(), s.profile, s.nick,
                 cameraEnabled = cs.enabled,
-                dullRounds = dullRounds,
+                rageRounds = rageRounds,
                 notes = notes.toList(),
             )
             val result = client.chat(s.baseUrl, s.apiKey, s.model, system, history.toList(), img)

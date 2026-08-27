@@ -2,10 +2,15 @@ package com.indhg.aiforcoyote
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.indhg.aiforcoyote.data.Settings
 import com.indhg.aiforcoyote.data.SettingsRepository
+import com.indhg.aiforcoyote.game.AudioObserver
+import com.indhg.aiforcoyote.game.AudioState
 import com.indhg.aiforcoyote.game.BleCoyote
+import com.indhg.aiforcoyote.game.CameraObserver
+import com.indhg.aiforcoyote.game.CameraState
 import com.indhg.aiforcoyote.game.DeviceState
 import com.indhg.aiforcoyote.game.Safety
 import com.indhg.aiforcoyote.game.parseAction
@@ -31,6 +36,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val safety = Safety(ble)
 
     val deviceState: StateFlow<DeviceState> = ble.state
+
+    // M2：观察闭环（摄像头截帧 + 麦克风音量分级）
+    private val camera = CameraObserver(app)
+    private val audio = AudioObserver(app, viewModelScope, onMoan = { kind, _ -> addNote(moanText(kind)) })
+    val cameraState: StateFlow<CameraState> = camera.state
+    val audioState: StateFlow<AudioState> = audio.state
+    private val notes = mutableListOf<String>()
+    private var dullRounds = 0
 
     private val _settings = MutableStateFlow(Settings())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
@@ -71,6 +84,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ble.disconnect()
     }
 
+    /** 前台开始观察（摄像头 + 麦克风）；权限缺失的自动降级不崩溃。 */
+    fun startObservation(owner: LifecycleOwner) {
+        camera.start(owner)
+        audio.start()
+    }
+
+    /** 退后台暂停观察。 */
+    fun stopObservation() {
+        camera.stop()
+        audio.stop()
+    }
+
+    private fun addNote(text: String) {
+        notes += text
+        if (notes.size > 5) notes.removeAt(0)
+    }
+
+    private fun moanText(kind: String): String = if (kind == "high") {
+        "麦克风检测到玩家发出较大的呻吟/惨叫（音量高）：应降低强度、安抚并关心，不要继续加码。"
+    } else {
+        "麦克风检测到玩家发出普通呻吟/呜呜声（音量中等）：挑逗等级可逐渐增加，小幅加码。"
+    }
+
     fun clearToast() {
         _toast.value = null
     }
@@ -98,7 +134,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { turn(userText = t) }
     }
 
-    private suspend fun turn(userText: String? = null, imageB64: String? = null) {
+    private suspend fun turn(userText: String? = null) {
         if (_busy.value) return
         _busy.value = true
         val s = _settings.value
@@ -108,8 +144,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _busy.value = false
                 return
             }
-            val system = SystemPrompt.build(getApplication(), s.profile, s.nick)
-            val result = client.chat(s.baseUrl, s.apiKey, s.model, system, history.toList(), imageB64)
+            // M2：观察信号——呆滞轮数（画面黑暗 / 持续无声）+ 最新帧注入 + 呻吟反馈
+            val cs = camera.state.value
+            val asSt = audio.state.value
+            var dull = false
+            if (cs.enabled) dull = dull || (cs.hasFrame && cs.dark)
+            if (asSt.enabled) dull = dull || asSt.silent
+            if (dull) dullRounds++ else dullRounds = 0
+            val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
+            val system = SystemPrompt.build(
+                getApplication(), s.profile, s.nick,
+                cameraEnabled = cs.enabled,
+                dullRounds = dullRounds,
+                notes = notes.toList(),
+            )
+            val result = client.chat(s.baseUrl, s.apiKey, s.model, system, history.toList(), img)
             val (executed, dropped) = safety.apply(result.actions.map { parseAction(it) })
             val note = buildString {
                 for (e in executed) append("▶ ").append(e.label).append("\n")
@@ -132,7 +181,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 val s = _settings.value
                 if (s.autopilot && s.apiKey.isNotBlank() && !_busy.value) {
-                    turn(imageB64 = null)
+                    turn()
                 }
                 delay(12_000L)
             }

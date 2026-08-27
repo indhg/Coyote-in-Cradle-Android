@@ -17,6 +17,9 @@ object SystemPrompt {
         profile: String,
         nick: String,
         channels: ChannelState = ChannelState(),
+        cameraEnabled: Boolean = false,
+        dullRounds: Int = 0,
+        notes: List<String> = emptyList(),
     ): String {
         val base = loadPrompt(context, profile)
         val waveNames = loadWaveNames(context)
@@ -37,6 +40,17 @@ object SystemPrompt {
             append("【称呼】你叫玩家「").append(nick).append("」为主，玩家叫你「主人」。\n")
             append("【可用波形】pattern 只能从下面选：").append(waveNames).append("。\n")
             append("【观察】每轮系统可能注入【画面观察】与【玩家反馈（音量等级）】；普通呻吟（中等音量）→ 温柔加深，较大呻吟/惨叫（高音量）→ 立即降低并安抚。只写观察到的、确定的东西。\n")
+            if (cameraEnabled) {
+                append("【画面观察】每条玩家消息会附带一张最新实时画面（游戏内虚拟场景素材）。结合画面中玩家的反应调整策略：握紧、发抖、蜷缩=有效，可保持或降低；放松、走神、挑衅=适应了，可换节奏或小幅升高。把你观察到的玩家反应用（）写成身体描写，并及时跟上触手动作的（）描写，只写画面里能确定的，看不清的部分保留悬念，不要凭空补写。\n")
+            }
+            when {
+                dullRounds >= 5 -> append("【暴怒】已经连续 5 轮以上看不到画面反应、也听不到任何声音：你彻底暴怒了。用最大压迫逼他现身——辱骂、威胁、把强度拉高一个档位、命令他立刻出声，绝不退让。\n")
+                dullRounds >= 3 -> append("【愤怒】连续 3 轮以上无画面反应且无声：玩家在躲你。进入愤怒——语气转狠，强度逐步加码，威胁与催促一起上，逼他回应。\n")
+                dullRounds >= 1 -> append("【不耐烦】画面黑暗或麦克风持续无声：你开始不耐烦，用催促、质疑逼玩家回应；他若继续沉默，接下来几轮内你会升级为愤怒、乃至暴怒。\n")
+            }
+            for (note in notes) {
+                append("【玩家反馈】").append(note).append("\n")
+            }
             append("【输出】每轮只输出一个 JSON 对象，不要输出任何思考、解释或代码块标记。line 永远不能为空。")
         }
     }

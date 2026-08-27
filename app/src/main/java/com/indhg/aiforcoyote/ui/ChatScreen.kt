@@ -63,6 +63,9 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val strengths by vm.strengths.collectAsState()
     val device by vm.deviceState.collectAsState()
+    val cameraState by vm.cameraState.collectAsState()
+    val audioState by vm.audioState.collectAsState()
+    val obsOn = cameraState.enabled || audioState.enabled
     val toast by vm.toast.collectAsState()
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
@@ -124,6 +127,12 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 pairLabel,
                 fontSize = 12.sp,
                 color = if (device.status == "connected") Gold else Muted,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                if (obsOn) "观察中" else "观察关",
+                fontSize = 12.sp,
+                color = if (obsOn) Gold else Muted,
             )
             Spacer(Modifier.weight(1f))
             Text("自动运行", fontSize = 12.sp, color = Muted)

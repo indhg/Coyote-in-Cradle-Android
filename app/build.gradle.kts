@@ -6,7 +6,7 @@ plugins {
 }
 
 /** 版本号：阶段标注（如 0.1.0-m1.2），同时写进 APK 文件名 */
-val appVersion = "0.1.0-m3.1"
+val appVersion = "0.1.0-m3.2"
 
 android {
     namespace = "com.indhg.aiforcoyote"

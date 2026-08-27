@@ -194,7 +194,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * M3：双通道保底（复刻桌面 _apply_channel_floor）：
-     * 第 2 轮起两通道都必须有波形 + 非零强度（自动修复）；每 3 轮内强度与波形各调整一次。
+     * 第 2 轮起两通道都必须有波形 + 非零强度（自动修复）；每 2 轮内强度与波形至少各调整一次。
      */
     private suspend fun applyChannelFloor() {
         if (deviceState.value.status != "connected") return
@@ -215,13 +215,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     fixed = true
                 }
             }
-            if (turnCount - (lastStrength[ch] ?: 0) >= 3) {
+            if (turnCount - (lastStrength[ch] ?: 0) >= 2) {
                 val delta = if (strength < 100) 5 else -5
                 safety.apply(listOf(DeviceAction("add_strength", ch, delta, null, null)))
                 lastStrength[ch] = turnCount
                 fixed = true
             }
-            if (turnCount - (lastWave[ch] ?: 0) >= 3) {
+            if (turnCount - (lastWave[ch] ?: 0) >= 2) {
                 safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)))
                 lastWave[ch] = turnCount
                 fixed = true

@@ -11,7 +11,6 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -120,22 +119,26 @@ class BleCoyote(
             return
         }
         _state.value = DeviceState("scanning")
-        val filters = listOf(ScanFilter.Builder().setDeviceName(DEVICE_NAME).build())
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
         scanCb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                stopScan()
-                _state.value = DeviceState("connecting")
-                connectGatt(result.device)
+                // 不用名字过滤器（广播包常缺名字，过滤器会漏掉设备），扫到后手动比对
+                val advertisedName = result.scanRecord?.deviceName ?: result.device.name
+                Log.i(TAG, "扫描到 BLE 设备 ${result.device.address} ($advertisedName)")
+                if (advertisedName == DEVICE_NAME) {
+                    stopScan()
+                    _state.value = DeviceState("connecting")
+                    connectGatt(result.device)
+                }
             }
 
             override fun onScanFailed(errorCode: Int) {
                 _state.value = DeviceState("disconnected", error = "扫描失败 code=$errorCode")
             }
         }
-        a.bluetoothLeScanner?.startScan(filters, settings, scanCb)
+        a.bluetoothLeScanner?.startScan(null, settings, scanCb)
         scope.launch {
             delay(SCAN_TIMEOUT_MS)
             if (_state.value.status == "scanning") {

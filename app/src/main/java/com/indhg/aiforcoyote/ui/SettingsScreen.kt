@@ -1,6 +1,10 @@
 package com.indhg.aiforcoyote.ui
 
-import androidx.compose.foundation.Image
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -32,13 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.indhg.aiforcoyote.MainViewModel
-import com.indhg.aiforcoyote.qr.QrCode
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
 import com.indhg.aiforcoyote.ui.theme.Ink
@@ -135,7 +138,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
 
         Spacer(Modifier.height(4.dp))
         Text("配对郊狼", fontSize = 13.sp, color = Muted)
-        PairSection(vm)
+        DeviceSection(vm)
 
         Text("角色设置", fontSize = 13.sp, color = Muted)
         OutlinedTextField(
@@ -178,40 +181,47 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun PairSection(vm: MainViewModel) {
-    val relay by vm.relayState.collectAsState()
-    when (relay.status) {
-        "paired" -> Text(
-            "已配对 · slotId ${relay.slotId ?: "—"}",
-            fontSize = 12.sp,
-            color = Gold,
-        )
-        "waiting" -> {
-            Text("用 DG-LAB 4.0 App 扫码配对（同一台手机）", fontSize = 12.sp, color = Muted)
-            Spacer(Modifier.height(8.dp))
-            val bmp = remember(relay.pairUrl) {
-                if (relay.pairUrl.isNotEmpty()) QrCode.bitmap(relay.pairUrl) else null
-            }
-            if (bmp != null) {
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "配对二维码",
-                    modifier = Modifier.size(200.dp),
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(relay.pairUrl, fontSize = 10.sp, color = Faint, maxLines = 3)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "若扫码失败：① 郊狼 App 内用「Socket V4」入口扫；② 确认两个 App 都在本机且郊狼 App 已更新；③ 仍失败把报错发我。",
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-                color = Faint,
-            )
-        }
-        "connecting" -> Text("中继连接中…", fontSize = 12.sp, color = Muted)
-        else -> Text("中继未连接（杀掉应用重开重试）", fontSize = 12.sp, color = Faint)
+private fun DeviceSection(vm: MainViewModel) {
+    val device by vm.deviceState.collectAsState()
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.all { it }) vm.connectDevice()
     }
+    val statusText = when (device.status) {
+        "connected" -> "已连接" + (device.battery?.let { " · 电量 $it%" } ?: "")
+        "scanning" -> "扫描中…（郊狼需开机且靠近手机）"
+        "connecting" -> "连接中…"
+        else -> "未连接"
+    }
+    Text("郊狼设备", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
+    Spacer(Modifier.height(6.dp))
+    Text(statusText, fontSize = 12.sp, color = if (device.status == "connected") Gold else Muted)
+    if (device.error.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(device.error, fontSize = 11.sp, lineHeight = 15.sp, color = Faint)
+    }
+    Spacer(Modifier.height(8.dp))
+    if (device.status == "connected") {
+        OutlinedButton(onClick = { vm.disconnectDevice() }) { Text("断开", fontSize = 13.sp, color = Muted) }
+    } else {
+        Button(
+            onClick = {
+                val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+                } else {
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+                val missing = perms.filter {
+                    ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                }
+                if (missing.isEmpty()) vm.connectDevice() else launcher.launch(perms)
+            },
+            enabled = device.status != "scanning" && device.status != "connecting",
+            colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Ink),
+        ) { Text("连接郊狼", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+    }
+    Spacer(Modifier.height(4.dp))
+    Text("蓝牙直连脉冲主机，无需郊狼 App 与中继。", fontSize = 11.sp, color = Faint)
 }
 
 @Composable

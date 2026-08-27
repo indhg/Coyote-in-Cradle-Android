@@ -18,6 +18,7 @@ import kotlinx.serialization.json.put
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import java.net.URI
+import java.net.URLEncoder
 
 /** 中继/配对状态。 */
 data class RelayState(
@@ -116,13 +117,15 @@ class CoyoteController(
             "hello" -> {
                 val cid = frame["clientId"]?.jsonPrimitive?.contentOrNull ?: return
                 Log.i(TAG, "拿到控制方 ID: $cid")
-                // 用手机局域网 IP 生成配对地址（郊狼 App 可能拒绝 127.0.0.1）
+                // 用手机局域网 IP 生成配对地址（郊狼 App 可能拒绝 127.0.0.1）；
+                // ws 链接整体 URL 编码，与桌面版 build_pair_url 完全一致
                 val host = com.indhg.aiforcoyote.util.LanIp.get()
+                val ws = "ws://$host:$relayPort?tid=$cid"
                 setState(
                     _state.value.copy(
                         status = "waiting",
                         controllerId = cid,
-                        pairUrl = "https://dungeon-lab.cn/s/?v=1&action=socket&url=ws://$host:$relayPort?tid=$cid",
+                        pairUrl = "https://dungeon-lab.cn/s/?v=1&action=socket&url=" + URLEncoder.encode(ws, "UTF-8"),
                     )
                 )
             }

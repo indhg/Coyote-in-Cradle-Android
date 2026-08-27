@@ -30,18 +30,16 @@ data class RelayState(
 )
 
 /**
- * 控制方客户端：连接本机内嵌中继，复刻桌面版 relay_client.py。
+ * 控制方客户端：连接中继（官方公共中继 trex.dungeon-lab.cn/v4，官方 SDK 同款地址）。
  * 自动重连；断线后由上层清零设备。
  */
 class CoyoteController(
-    private val url: String = "ws://127.0.0.1:9998",
+    private val url: String = "wss://trex.dungeon-lab.cn/v4",
     private val reconnectDelayMs: Long = 3_000,
     val onDisconnect: () -> Unit = {},
 ) : WebSocketClient(URI(url)) {
 
     private val json = Json { ignoreUnknownKeys = true }
-
-    private val relayPort: Int = URI(url).port.let { if (it > 0) it else 9998 }
 
     private val _state = MutableStateFlow(RelayState())
     val state: StateFlow<RelayState> = _state.asStateFlow()
@@ -117,10 +115,8 @@ class CoyoteController(
             "hello" -> {
                 val cid = frame["clientId"]?.jsonPrimitive?.contentOrNull ?: return
                 Log.i(TAG, "拿到控制方 ID: $cid")
-                // 用手机局域网 IP 生成配对地址（郊狼 App 可能拒绝 127.0.0.1）；
-                // ws 链接整体 URL 编码，与桌面版 build_pair_url 完全一致
-                val host = com.indhg.aiforcoyote.util.LanIp.get()
-                val ws = "ws://$host:$relayPort?tid=$cid"
+                // 配对链接：郊狼 App 连同一台中继（官方格式：wss://…/v4/?tid=<cid>，整体 URL 编码）
+                val ws = "${url.trimEnd('/')}/?tid=$cid"
                 setState(
                     _state.value.copy(
                         status = "waiting",

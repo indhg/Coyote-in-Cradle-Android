@@ -5,9 +5,9 @@
 ## 状态
 
 - [x] M0：聊天气泡 + 设置页 + DeepSeek 调用（reasoning 回退 + 4 轮重试）+ 游戏循环骨架 + 安全层
-- [ ] M1：内嵌中继（v4 协议 controller）+ 配对二维码 + 设备下发 + 心跳
+- [x] M1：设备闭环 = **BLE 直连郊狼 3.0**（官方蓝牙协议 coyote/v3，B0 帧 100ms 流式下发；中继方案已废弃，relay/ 目录保留未用）
 - [ ] M2：摄像头分级 + 麦克风音量分级接入循环
-- [ ] M3：双通道保底 / 波形 30s 重发 / 断线重连 / DLC 分包 / APK 打包
+- [ ] M3：双通道保底 / 断线重连 / DLC 分包 / APK 打包
 
 ## 构建
 
@@ -25,7 +25,8 @@ app/src/main/java/com/indhg/aiforcoyote/
 ├── llm/DeepSeekClient.kt OpenAI 兼容客户端（vision 多段格式 + 推理泄漏回退）
 ├── llm/SystemPrompt.kt   系统提示词构建（角色提示词 assets + 设备映射注入）
 ├── game/Safety.kt        安全层（上限/步长/过热/清零）
-├── game/DeviceOps.kt     设备指令接口（M0 Noop，M1 换中继）
+├── game/BleCoyote.kt     BLE 直连设备驱动（B0/BF 指令、100ms 流式循环，官方 V3 协议）
+├── game/DeviceOps.kt     设备指令接口（M0 Noop / M1 BleCoyote）
 └── ui/                   聊天页 / 设置页 / 暗金主题
 ```
 

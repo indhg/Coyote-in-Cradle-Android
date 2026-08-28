@@ -209,12 +209,35 @@ private fun DeviceSection(vm: MainViewModel) {
         "connecting" -> "连接中…"
         else -> "未连接"
     }
+    val scanDevices by vm.scanDevices.collectAsState()
     Text("郊狼设备", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
     Spacer(Modifier.height(6.dp))
     Text(statusText, fontSize = 12.sp, color = if (device.status == "connected") Gold else Muted)
     if (device.error.isNotEmpty()) {
         Spacer(Modifier.height(4.dp))
         Text(device.error, fontSize = 11.sp, lineHeight = 15.sp, color = Faint)
+    }
+    if (device.status != "connected") {
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "连接步骤：① 郊狼开机并靠近手机 ② 官方郊狼 App 断开并退出 ③ 点「连接郊狼」 ④ 扫描列表里点信号最强的设备",
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = Faint,
+        )
+    }
+    if (device.status == "scanning" && scanDevices.isNotEmpty()) {
+        Spacer(Modifier.height(6.dp))
+        Text("点选设备直连（信号强的在前）：", fontSize = 11.sp, color = Faint)
+        scanDevices.take(8).forEach { d ->
+            TextButton(onClick = { vm.connectToDeviceByAddr(d.address) }) {
+                Text(
+                    "${d.name ?: "无名设备"}  ${d.address}  ${d.rssi}dBm",
+                    fontSize = 11.sp,
+                    color = Muted,
+                )
+            }
+        }
     }
     Spacer(Modifier.height(8.dp))
     if (device.status == "connected") {

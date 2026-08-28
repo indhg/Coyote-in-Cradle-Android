@@ -34,6 +34,9 @@ data class DeviceState(
     val error: String = "",
 )
 
+/** 扫描到的 BLE 设备（供用户手动选择）。 */
+data class ScanDevice(val name: String?, val address: String, val rssi: Int)
+
 /**
  * 郊狼 3.0 BLE 直连驱动（官方蓝牙协议 coyote/v3，无需郊狼 App / 中继）。
  * - 服务 0x180C / 写 0x150A / 通知 0x150B；电量 0x180A / 0x1500
@@ -80,6 +83,9 @@ class BleCoyote(
 
     private val _state = MutableStateFlow(DeviceState())
     val state: StateFlow<DeviceState> = _state.asStateFlow()
+
+    private val _scanDevices = MutableStateFlow<List<ScanDevice>>(emptyList())
+    val scanDevices: StateFlow<List<ScanDevice>> = _scanDevices.asStateFlow()
 
     private val appContext = context.applicationContext
     private val adapter: BluetoothAdapter? =
@@ -149,8 +155,22 @@ class BleCoyote(
         startScan(a)
     }
 
+    /** 用户从扫描列表手动选择设备直连。 */
+    fun connectTo(address: String) {
+        wantConnection = true
+        val a = adapter ?: return
+        stopScan()
+        _state.value = DeviceState("connecting")
+        try {
+            connectGatt(a.getRemoteDevice(address))
+        } catch (_: Exception) {
+            _state.value = DeviceState("disconnected", error = "连接失败：地址无效")
+        }
+    }
+
     private fun startScan(a: BluetoothAdapter) {
         _state.value = DeviceState("scanning")
+        _scanDevices.value = emptyList()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
@@ -166,6 +186,10 @@ class BleCoyote(
                     seen += desc
                     Log.i(TAG, "扫描到 BLE 设备 $desc")
                 }
+                // 更新可选列表（按信号强度排序）
+                _scanDevices.value = (_scanDevices.value.filterNot { it.address == result.device.address } +
+                    ScanDevice(advertisedName, result.device.address, result.rssi))
+                    .sortedByDescending { it.rssi }
                 // 名字匹配 / 广播主服务 0x180C / 历史地址，任一命中即连
                 if (advertisedName == DEVICE_NAME || uuids.contains(SERVICE) || result.device.address == savedAddr) {
                     stopScan()
@@ -197,6 +221,8 @@ class BleCoyote(
         } catch (_: Exception) {
         }
         closeGatt()
+        // closeGatt 会掐掉回调，这里必须手动同步状态，否则 UI 卡在「已连接」
+        _state.value = DeviceState("disconnected", battery = _state.value.battery)
     }
 
     private fun stopScan() {

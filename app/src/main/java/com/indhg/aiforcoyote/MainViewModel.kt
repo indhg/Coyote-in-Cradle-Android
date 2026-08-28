@@ -16,6 +16,7 @@ import com.indhg.aiforcoyote.game.CameraState
 import com.indhg.aiforcoyote.game.DeviceAction
 import com.indhg.aiforcoyote.game.DeviceState
 import com.indhg.aiforcoyote.game.Safety
+import com.indhg.aiforcoyote.game.ScanDevice
 import com.indhg.aiforcoyote.game.parseAction
 import com.indhg.aiforcoyote.llm.DeepSeekClient
 import com.indhg.aiforcoyote.llm.SystemPrompt
@@ -39,6 +40,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val safety = Safety(ble)
 
     val deviceState: StateFlow<DeviceState> = ble.state
+    val scanDevices: StateFlow<List<ScanDevice>> = ble.scanDevices
 
     // M2：观察闭环（摄像头截帧 + 麦克风音量分级）
     private val camera = CameraObserver(app)
@@ -92,6 +94,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun connectDevice() {
         ble.connect()
+    }
+
+    fun connectToDeviceByAddr(addr: String) {
+        ble.connectTo(addr)
     }
 
     fun disconnectDevice() {

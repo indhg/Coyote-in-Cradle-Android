@@ -74,7 +74,8 @@ class CameraObserver(private val context: Context) {
                     .build()
                 analysis.setAnalyzer(executor) { proxy -> analyze(proxy) }
                 p.unbindAll()
-                p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, analysis)
+                // 前置摄像头：与屏幕同面，观察面对屏幕的玩家
+                p.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
                 _state.value = _state.value.copy(enabled = true, error = "")
                 Log.i(TAG, "摄像头已启动")
             } catch (e: Exception) {

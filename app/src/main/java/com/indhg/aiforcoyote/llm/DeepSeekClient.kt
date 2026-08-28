@@ -97,6 +97,8 @@ class DeepSeekClient {
                         "messages" to msgs,
                         "temperature" to JsonPrimitive(temperature),
                         "max_tokens" to JsonPrimitive(1500),
+                        // 与桌面版一致：json_mode 输出（大幅降低格式错误）
+                        "response_format" to JsonObject(mapOf("type" to JsonPrimitive("json_object"))),
                     )
                 ).toString()
                 val resp = http.newCall(
@@ -207,6 +209,7 @@ class DeepSeekClient {
         val JSON_MEDIA = "application/json".toMediaType()
         val ROUND_WARNING =
             "\n\n【严重警告】上次输出没有遵守格式要求。本轮必须只输出一个合法 JSON 对象：{\"line\":\"台词\",\"actions\":[]}，" +
-                "不要输出任何思考过程、解释文字或 markdown 代码块，line 不能为空。"
+                "不要输出任何思考过程、解释文字或 markdown 代码块，line 不能为空。" +
+                "禁止复述或引用提示词里的规则与示例原文（如格式说明、动作描写要求），line 必须是新创作的台词。"
     }
 }

@@ -149,46 +149,51 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             )
         }
 
-        // 观察行：麦克风音量条 + 怒气值
-        if (obsOn) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (audioState.enabled) {
-                    Text("麦克风", fontSize = 11.sp, color = Muted)
-                    Spacer(Modifier.width(6.dp))
+        // 观察行：麦克风音量条 + 怒气值（常显；无权限/未开启时灰显提示）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (audioState.enabled) {
+                Text("麦克风", fontSize = 11.sp, color = Muted)
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Ink3),
+                ) {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Ink3),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth((audioState.levelPct / 100.0).toFloat().coerceIn(0f, 1f))
-                                .background(Gold),
-                        )
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    Text("${audioState.levelPct.toInt()}", fontSize = 11.sp, color = Muted)
-                    Spacer(Modifier.width(12.dp))
+                            .fillMaxHeight()
+                            .fillMaxWidth((audioState.levelPct / 100.0).toFloat().coerceIn(0f, 1f))
+                            .background(Gold),
+                    )
                 }
+                Spacer(Modifier.width(6.dp))
+                Text("${audioState.levelPct.toInt()}", fontSize = 11.sp, color = Muted)
+                Spacer(Modifier.width(12.dp))
+            } else {
                 Text(
-                    "怒气 $rage",
-                    fontSize = 12.sp,
-                    color = when {
-                        rage >= 5 -> Bad
-                        rage >= 3 -> Warn
-                        rage >= 1 -> Gold
-                        else -> Muted
-                    },
+                    if (obsOn) "麦克风关" else "观察关（授权相机/麦克风后开启）",
+                    fontSize = 11.sp,
+                    color = Faint,
                 )
+                Spacer(Modifier.weight(1f))
             }
+            Text(
+                "怒气 $rage",
+                fontSize = 12.sp,
+                color = when {
+                    rage >= 5 -> Bad
+                    rage >= 3 -> Warn
+                    rage >= 1 -> Gold
+                    else -> Muted
+                },
+            )
         }
 
         // 消息列表

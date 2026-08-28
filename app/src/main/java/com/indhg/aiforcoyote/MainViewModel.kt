@@ -104,22 +104,72 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         audio.start()
     }
 
-    /** 调教版 DLC：导入提示词文件（SAF 选 .md → 拷贝到应用私有目录）。 */
+    /** 调教版 DLC：导入 zip 包（解出全部 .md）或单个 .md 到应用私有目录。 */
     fun importDlc(uri: Uri): Boolean {
         return try {
-            val target = dlcFile()
-            target.parentFile?.mkdirs()
-            val input = getApplication<Application>().contentResolver.openInputStream(uri) ?: return false
-            input.use { ins ->
-                target.outputStream().use { out -> ins.copyTo(out) }
+            val app = getApplication<Application>()
+            val name = queryDisplayName(uri)
+            val ok = if (name?.endsWith(".zip", ignoreCase = true) == true) {
+                importDlcZip(app, uri)
+            } else {
+                importDlcMd(app, uri)
             }
-            _dlcInstalled.value = true
-            _toast.value = "调教版已导入，可在「对话风格」切换"
-            true
+            if (ok && dlcFile().exists()) {
+                _dlcInstalled.value = true
+                _toast.value = "调教版已导入，可在「对话风格」切换"
+                true
+            } else {
+                _toast.value = "导入完成，但没找到提示词文件（触手-角色提示词-调教.md）"
+                false
+            }
         } catch (e: Exception) {
             _toast.value = "导入失败：${e.message}"
             false
         }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return try {
+            getApplication<Application>().contentResolver.query(uri, null, null, null, null)?.use { c ->
+                if (c.moveToFirst()) {
+                    val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) c.getString(idx) else null
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** zip 包：解出全部 .md（去掉目录层级，保留文件名）。 */
+    private fun importDlcZip(app: Application, uri: Uri): Boolean {
+        val dir = dlcFile().parentFile ?: return false
+        dir.mkdirs()
+        var foundMd = false
+        app.contentResolver.openInputStream(uri)?.use { ins ->
+            java.util.zip.ZipInputStream(ins).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name.substringAfterLast('/')
+                    if (!entry.isDirectory && name.endsWith(".md", ignoreCase = true)) {
+                        java.io.File(dir, name).outputStream().use { out -> zip.copyTo(out) }
+                        foundMd = true
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } ?: return false
+        return foundMd
+    }
+
+    private fun importDlcMd(app: Application, uri: Uri): Boolean {
+        val target = dlcFile()
+        target.parentFile?.mkdirs()
+        app.contentResolver.openInputStream(uri)?.use { ins ->
+            target.outputStream().use { out -> ins.copyTo(out) }
+        } ?: return false
+        return true
     }
 
     private fun dlcFile(): java.io.File =

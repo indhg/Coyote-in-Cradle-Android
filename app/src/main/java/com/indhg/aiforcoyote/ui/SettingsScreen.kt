@@ -174,8 +174,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             Text("调教版为 DLC 内容，导入后即可切换", fontSize = 11.sp, color = Faint)
             Spacer(Modifier.height(4.dp))
             OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("text/markdown", "text/plain", "application/octet-stream")) },
-            ) { Text("导入调教版（选择 .md 文件）", fontSize = 12.sp, color = Muted) }
+                onClick = {
+                    importLauncher.launch(
+                        arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "text/markdown", "text/plain"),
+                    )
+                },
+            ) { Text("导入调教版（选择 .zip 或 .md）", fontSize = 12.sp, color = Muted) }
         }
 
         Text(

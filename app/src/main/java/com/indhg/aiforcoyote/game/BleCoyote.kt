@@ -51,6 +51,7 @@ class BleCoyote(
     companion object {
         private const val TAG = "BleCoyote"
         private const val DEVICE_NAME = "47L121000"
+        private const val PREF_ADDR = "coyote_addr"
         private const val SCAN_TIMEOUT_MS = 15_000L
         private const val STREAM_INTERVAL_MS = 100L
         private const val RECONNECT_DELAY_MS = 3_000L
@@ -83,6 +84,7 @@ class BleCoyote(
     private val appContext = context.applicationContext
     private val adapter: BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+    private val prefs = appContext.getSharedPreferences("ble", android.content.Context.MODE_PRIVATE)
 
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
@@ -123,16 +125,49 @@ class BleCoyote(
             _state.value = _state.value.copy(error = "本机无蓝牙")
             return
         }
+        // ① 系统已配对设备里找郊狼（官方 App 配对后广播不再带名字，但配对列表里有名字）
+        val bonded = a.bondedDevices?.firstOrNull { it.name == DEVICE_NAME }
+        if (bonded != null) {
+            Log.i(TAG, "已配对列表直连 ${bonded.address}")
+            _state.value = DeviceState("connecting")
+            connectGatt(bonded)
+            return
+        }
+        // ② 记住的历史地址直连
+        val savedAddr = prefs.getString(PREF_ADDR, null)
+        if (savedAddr != null) {
+            Log.i(TAG, "历史地址直连 $savedAddr")
+            _state.value = DeviceState("connecting")
+            try {
+                connectGatt(a.getRemoteDevice(savedAddr))
+                return
+            } catch (_: Exception) {
+                // 地址无效则走扫描
+            }
+        }
+        // ③ 扫描兜底
+        startScan(a)
+    }
+
+    private fun startScan(a: BluetoothAdapter) {
         _state.value = DeviceState("scanning")
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
+        val seen = mutableListOf<String>()
+        val savedAddr = prefs.getString(PREF_ADDR, null)
         scanCb = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 // 不用名字过滤器（广播包常缺名字，过滤器会漏掉设备），扫到后手动比对
                 val advertisedName = result.scanRecord?.deviceName ?: result.device.name
-                Log.i(TAG, "扫描到 BLE 设备 ${result.device.address} ($advertisedName)")
-                if (advertisedName == DEVICE_NAME) {
+                val uuids = result.scanRecord?.serviceUuids?.map { it.uuid } ?: emptyList()
+                val desc = "${result.device.address}(${advertisedName ?: "无名"}${if (uuids.isNotEmpty()) " srv=${uuids.joinToString("+")}" else ""})"
+                if (seen.none { it.startsWith(result.device.address) }) {
+                    seen += desc
+                    Log.i(TAG, "扫描到 BLE 设备 $desc")
+                }
+                // 名字匹配 / 广播主服务 0x180C / 历史地址，任一命中即连
+                if (advertisedName == DEVICE_NAME || uuids.contains(SERVICE) || result.device.address == savedAddr) {
                     stopScan()
                     _state.value = DeviceState("connecting")
                     connectGatt(result.device)
@@ -148,7 +183,8 @@ class BleCoyote(
             delay(SCAN_TIMEOUT_MS)
             if (_state.value.status == "scanning") {
                 stopScan()
-                _state.value = DeviceState("disconnected", error = "未找到郊狼（BLE 名 $DEVICE_NAME）")
+                val extra = if (seen.isEmpty()) "（周围没扫到任何 BLE 设备）" else "；扫到：${seen.joinToString("；")}"
+                _state.value = DeviceState("disconnected", error = "未找到郊狼（BLE 名 $DEVICE_NAME）$extra")
             }
         }
     }
@@ -222,6 +258,8 @@ class BleCoyote(
             val battery = g.getService(BATTERY_SERVICE)?.getCharacteristic(BATTERY_CHAR)
             if (battery != null) enableNotify(g, battery)
             writeBf() // 重连必写软上限（官方警告）
+            // 记住地址：下次即使广播不带名字也能直连
+            prefs.edit().putString(PREF_ADDR, g.device.address).apply()
             // 复位强度为 0（断开时本地位已清零，dirty 已置位）
             _state.value = DeviceState("connected")
             ensureStreaming()

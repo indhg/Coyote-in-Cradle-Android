@@ -1,6 +1,7 @@
 package com.indhg.aiforcoyote
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
@@ -66,6 +67,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast.asStateFlow()
 
+    // DLC：调教版提示词是否已导入（导入后写 filesDir/dlc/）
+    private val _dlcInstalled = MutableStateFlow(dlcFileExists())
+    val dlcInstalled: StateFlow<Boolean> = _dlcInstalled.asStateFlow()
+
     private val history = mutableListOf<Pair<String, String>>()
     private var loopJob: Job? = null
 
@@ -96,6 +101,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         camera.start(owner)
         audio.start()
     }
+
+    /** 调教版 DLC：导入提示词文件（SAF 选 .md → 拷贝到应用私有目录）。 */
+    fun importDlc(uri: Uri): Boolean {
+        return try {
+            val target = dlcFile()
+            target.parentFile?.mkdirs()
+            val input = getApplication<Application>().contentResolver.openInputStream(uri) ?: return false
+            input.use { ins ->
+                target.outputStream().use { out -> ins.copyTo(out) }
+            }
+            _dlcInstalled.value = true
+            _toast.value = "调教版已导入，可在「对话风格」切换"
+            true
+        } catch (e: Exception) {
+            _toast.value = "导入失败：${e.message}"
+            false
+        }
+    }
+
+    private fun dlcFile(): java.io.File =
+        java.io.File(getApplication<Application>().filesDir, SystemPrompt.DLC_PROMPT_REL)
+
+    private fun dlcFileExists(): Boolean = dlcFile().exists()
 
     /** 退后台暂停观察。 */
     fun stopObservation() {

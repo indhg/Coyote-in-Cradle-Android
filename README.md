@@ -2,6 +2,15 @@
 
 纯安卓、零电脑依赖的 AI 郊狼角色扮演 App。AI 扮演「触手」，用手机摄像头 + 麦克风观察玩家反应，**BLE 直连** DG-Lab 郊狼 3.0 设备（无需官方郊狼 App 与中继）。
 
+## 📦 相关仓库（重要）
+
+本项目是**多端应用**，除本仓库（安卓端）外还有两个配套仓库：
+
+| 仓库 | 地址 | 说明 |
+|---|---|---|
+| 🖥️ **PC 主仓库** | [indhg/AI-for-Coyote](https://github.com/indhg/AI-for-Coyote) | 桌面控制台版（Windows 绿色免装包，网页控制台 + 中继配对） |
+| 🧪 **DLC 拓展仓库** | [indhg/AI-for-Coyote-DLC](https://github.com/indhg/AI-for-Coyote-DLC) | 18+ 拓展内容（调教版等；本端支持导入 .md 启用） |
+
 ## 状态
 
 - [x] M0：聊天气泡 + 设置页 + DeepSeek 调用（reasoning 回退 + 4 轮重试）+ 游戏循环骨架 + 安全层

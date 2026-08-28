@@ -1,6 +1,7 @@
 package com.indhg.aiforcoyote.llm
 
 import android.content.Context
+import java.io.File
 import java.io.IOException
 
 /**
@@ -8,6 +9,9 @@ import java.io.IOException
  * 再注入设备映射 / 强度基准 / 通道状态 / 波形列表等运行时信息，与桌面版 build_system_prompt 对齐。
  */
 object SystemPrompt {
+
+    /** 调教版 DLC 提示词文件（应用私有目录内相对路径，导入时写入）。 */
+    const val DLC_PROMPT_REL = "dlc/触手-角色提示词-调教.md"
 
     /** 当前通道工作状态（M1 接入中继后为真实状态，M0 恒为双通道开启） */
     data class ChannelState(val working: Map<String, Boolean> = mapOf("A" to true, "B" to true))
@@ -57,12 +61,13 @@ object SystemPrompt {
     }
 
     private fun loadPrompt(context: Context, profile: String): String {
-        // M0：纯爱版打包在 assets；调教版走 DLC 文件（M3 接入），未安装时报错提示
-        val name = when (profile) {
-            "调教" -> throw IOException("调教版 DLC 未安装：请先在设置页导入 DLC 包")
-            else -> "prompts/触手-角色提示词-纯爱.md"
+        if (profile == "调教") {
+            // DLC：从应用私有目录加载导入的提示词文件（未导入时报错，UI 有未装拦截）
+            val f = File(context.filesDir, DLC_PROMPT_REL)
+            if (f.exists()) return f.readText()
+            throw IOException("调教版 DLC 未安装：请先在设置页导入 DLC 包")
         }
-        return context.assets.open(name).bufferedReader().use { it.readText() }
+        return context.assets.open("prompts/触手-角色提示词-纯爱.md").bufferedReader().use { it.readText() }
     }
 
     private fun loadWaveNames(context: Context): String {

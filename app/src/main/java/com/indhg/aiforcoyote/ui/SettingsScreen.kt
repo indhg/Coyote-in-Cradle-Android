@@ -52,11 +52,15 @@ import com.indhg.aiforcoyote.ui.theme.TextMain
 @Composable
 fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val settings by vm.settings.collectAsState()
+    val dlcInstalled by vm.dlcInstalled.collectAsState()
     var apiKey by remember { mutableStateOf("") }
     var baseUrl by remember { mutableStateOf(settings.baseUrl) }
     var model by remember { mutableStateOf(settings.model) }
     var nick by remember { mutableStateOf(settings.nick) }
     var status by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { vm.importDlc(it) }
+    }
 
     val inputColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = Gold,
@@ -160,11 +164,19 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             StyleChip("纯爱", selected = settings.profile == "纯爱", enabled = true) {
                 vm.updateSettings { it.copy(profile = "纯爱") }
             }
-            StyleChip("调教", selected = settings.profile == "调教", enabled = false) {
-                // DLC 未安装（M3 接入分包后启用）
+            StyleChip("调教", selected = settings.profile == "调教", enabled = dlcInstalled) {
+                vm.updateSettings { it.copy(profile = "调教") }
             }
         }
-        Text("调教版为 DLC 内容（后续版本提供下载）", fontSize = 11.sp, color = Faint)
+        if (dlcInstalled) {
+            Text("调教版已导入", fontSize = 11.sp, color = Faint)
+        } else {
+            Text("调教版为 DLC 内容，导入后即可切换", fontSize = 11.sp, color = Faint)
+            Spacer(Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("text/markdown", "text/plain", "application/octet-stream")) },
+            ) { Text("导入调教版（选择 .md 文件）", fontSize = 12.sp, color = Muted) }
+        }
 
         Text(
             "仅供成年人、双方自愿的虚构角色扮演使用。心脏病、心脏起搏器等健康风险人群请勿使用。",

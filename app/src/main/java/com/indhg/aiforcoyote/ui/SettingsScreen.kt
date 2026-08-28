@@ -220,7 +220,7 @@ private fun DeviceSection(vm: MainViewModel) {
     if (device.status != "connected") {
         Spacer(Modifier.height(6.dp))
         Text(
-            "连接步骤：① 郊狼开机并靠近手机 ② 官方郊狼 App 断开并退出 ③ 点「连接郊狼」 ④ 扫描列表里点信号最强的设备",
+            "连接步骤：① 郊狼开机并靠近手机 ② 点「连接郊狼」 ③ 扫描列表里点信号最强的设备\n请不要在官方 App 已连接郊狼的情况下使用。",
             fontSize = 11.sp,
             lineHeight = 15.sp,
             color = Faint,

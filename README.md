@@ -1,6 +1,6 @@
 # Coyote in Cradle（安卓端）
 
-纯安卓、零电脑依赖的 AI 郊狼角色扮演 App。AI 扮演「触手」，用手机摄像头 + 麦克风观察玩家反应，**BLE 直连** DG-Lab 郊狼 3.0 设备（无需官方郊狼 App 与中继）。
+AI×郊狼角色扮演 App。AI 扮演「触手」，用手机摄像头 + 麦克风观察玩家反应，**BLE 直连** DG-Lab 郊狼 3.0 设备（无需官方郊狼 App 与中继）。
 
 ## 📦 相关仓库（重要）
 
@@ -8,16 +8,16 @@
 
 | 仓库 | 地址 | 说明 |
 |---|---|---|
-| 🖥️ **PC 主仓库** | [indhg/AI-for-Coyote](https://github.com/indhg/AI-for-Coyote) | 桌面控制台版（Windows 绿色免装包，网页控制台 + 中继配对） |
+| 🖥️ **PC 主仓库** | [indhg/AI-for-Coyote](https://github.com/indhg/AI-for-Coyote) | 桌面控制台版 |
 | 🧪 **DLC 拓展仓库** | [indhg/AI-for-Coyote-DLC](https://github.com/indhg/AI-for-Coyote-DLC) | 18+ 拓展内容（调教版等；本端支持导入 .md 启用） |
 
 ## 状态
 
-- [x] M0：聊天气泡 + 设置页 + DeepSeek 调用（reasoning 回退 + 4 轮重试）+ 游戏循环骨架 + 安全层
+- [x] M0：聊天气泡 + 设置页 + DeepSeek 调用 + 游戏循环骨架 + 安全层
 - [x] M1：设备闭环 = BLE 直连郊狼 3.0（官方蓝牙协议 coyote/v3，B0 帧 100ms 流式下发 + BF 软上限 + 断线自动重连）
 - [x] M2：摄像头分级 + 麦克风音量分级接入循环（真机效果待验证）
 - [x] M3：双通道保底 / 断线重连 / release 打包（debug 签名侧载包）
-- [ ] 后置：调教版 DLC 本地导入 + 双风格切换
+- [x] M4：调教版 DLC 本地导入 + 双风格切换
 
 ## 构建
 
@@ -45,6 +45,6 @@ app/src/main/java/com/indhg/aiforcoyote/
 
 ## 内容与许可
 
-- 内置纯爱版提示词（assets/prompts/）；调教版作为 DLC 本地导入（后置）
+- 内置纯爱版提示词（assets/prompts/）；调教版作为 DLC 本地导入
 - 18+ 虚构、双方自愿；成人内容仅限侧载分发
 - 桌面版主仓库：github.com/indhg/AI-for-Coyote；DLC 仓库：github.com/indhg/AI-for-Coyote-DLC

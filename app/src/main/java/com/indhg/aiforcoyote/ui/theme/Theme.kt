@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.Color
 
 val Gold = Color(0xFFF7D97A)
 val GoldBright = Color(0xFFFFE59A)
+val Bad = Color(0xFFFF5470)
+val Warn = Color(0xFFFFC966)
 val Ink = Color(0xFF14100A)
 val Ink2 = Color(0xFF1E1810)
 val Ink3 = Color(0xFF2A2216)

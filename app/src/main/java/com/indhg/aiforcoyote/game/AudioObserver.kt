@@ -24,6 +24,7 @@ data class AudioState(
     val enabled: Boolean = false,
     val running: Boolean = false,
     val level: Double = 0.0,
+    val levelPct: Double = 0.0,
     val silent: Boolean = true,
     val error: String = "",
 )
@@ -45,8 +46,8 @@ class AudioObserver(
         private const val TAG = "AudioObs"
         private const val SAMPLE_RATE = 16000
         private const val WINDOW_S = 4
-        private const val THRESHOLD = 0.02
-        private const val MOAN_HIGH_MULTIPLE = 8.0
+        private const val THRESHOLD = 0.005
+        private const val MOAN_HIGH_MULTIPLE = 4.0
         private const val MOAN_COOLDOWN_S = 5.0
         private const val SILENCE_TIMEOUT_S = 90.0
     }
@@ -135,7 +136,9 @@ class AudioObserver(
             sum += f * f
         }
         val rms = sqrt(sum / window.size)
-        _state.value = _state.value.copy(level = rms)
+        // UI 音量条：相对「惨叫档」（threshold×倍数）的百分比，100=惨叫级（与 PC 同口径）
+        val pct = (rms / (THRESHOLD * MOAN_HIGH_MULTIPLE) * 100.0).coerceAtMost(100.0)
+        _state.value = _state.value.copy(level = rms, levelPct = pct)
         val now = System.currentTimeMillis() / 1000.0
         if (rms >= THRESHOLD) {
             lastSoundTs = now

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.indhg.aiforcoyote.MainViewModel
 import com.indhg.aiforcoyote.UiMsg
+import com.indhg.aiforcoyote.ui.theme.Bad
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
 import com.indhg.aiforcoyote.ui.theme.Ink
@@ -55,6 +58,7 @@ import com.indhg.aiforcoyote.ui.theme.Ink3
 import com.indhg.aiforcoyote.ui.theme.Line
 import com.indhg.aiforcoyote.ui.theme.Muted
 import com.indhg.aiforcoyote.ui.theme.TextMain
+import com.indhg.aiforcoyote.ui.theme.Warn
 
 @Composable
 fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
@@ -65,6 +69,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val device by vm.deviceState.collectAsState()
     val cameraState by vm.cameraState.collectAsState()
     val audioState by vm.audioState.collectAsState()
+    val rage by vm.rage.collectAsState()
     val obsOn = cameraState.enabled || audioState.enabled
     val toast by vm.toast.collectAsState()
     val listState = rememberLazyListState()
@@ -142,6 +147,48 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 onCheckedChange = { vm.toggleAutopilot() },
                 colors = SwitchDefaults.colors(checkedTrackColor = Gold, checkedThumbColor = Ink),
             )
+        }
+
+        // 观察行：麦克风音量条 + 怒气值
+        if (obsOn) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (audioState.enabled) {
+                    Text("麦克风", fontSize = 11.sp, color = Muted)
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Ink3),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth((audioState.levelPct / 100.0).toFloat().coerceIn(0f, 1f))
+                                .background(Gold),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text("${audioState.levelPct.toInt()}", fontSize = 11.sp, color = Muted)
+                    Spacer(Modifier.width(12.dp))
+                }
+                Text(
+                    "怒气 $rage",
+                    fontSize = 12.sp,
+                    color = when {
+                        rage >= 5 -> Bad
+                        rage >= 3 -> Warn
+                        rage >= 1 -> Gold
+                        else -> Muted
+                    },
+                )
+            }
         }
 
         // 消息列表

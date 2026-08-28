@@ -47,6 +47,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val audioState: StateFlow<AudioState> = audio.state
     private val notes = mutableListOf<String>()
     private var rageRounds = 0
+    private val _rage = MutableStateFlow(0)
+    val rage: StateFlow<Int> = _rage.asStateFlow()
 
     // M3：双通道保底（轮次计数 + 每通道最近一次强度/波形调整轮次）
     private var turnCount = 0
@@ -186,6 +188,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (cs.enabled) rage = rage || (cs.hasFrame && cs.dark)
             if (asSt.enabled) rage = rage || asSt.silent
             if (rage) rageRounds++ else rageRounds = 0
+            _rage.value = rageRounds
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
             val system = SystemPrompt.build(
                 getApplication(), s.profile, s.nick,

@@ -19,13 +19,37 @@ class Safety(private val device: DeviceOps) {
     private val _strengths = MutableStateFlow(mapOf("A" to 0, "B" to 0))
     val strengths: StateFlow<Map<String, Int>> = _strengths.asStateFlow()
 
-    private val caps = mutableMapOf("A" to 100, "B" to 100)
+    // 硬上限 = 郊狼满值 200；运行时上限默认 100（页面可调 1~200，不持久化）
+    private val hardCaps = mapOf("A" to 200, "B" to 200)
+    private val userCaps = mutableMapOf("A" to 100, "B" to 100)
+    private val _caps = MutableStateFlow(mapOf("A" to 100, "B" to 100))
+    val caps: StateFlow<Map<String, Int>> = _caps.asStateFlow()
+
     var overheat = false
         set(value) {
             field = value
-            caps["A"] = if (value) 20 else 100
-            caps["B"] = if (value) 20 else 100
+            publishCaps()
         }
+
+    /** 通道生效上限：min(硬上限, 用户上限, 过热 20)。 */
+    fun capFor(ch: String): Int {
+        val hard = hardCaps[ch] ?: 200
+        val user = userCaps[ch] ?: 100
+        return min(hard, if (overheat) min(user, 20) else user)
+    }
+
+    /** 调整通道运行时上限（1~200）。 */
+    fun setUserCap(ch: String, value: Int) {
+        val v = value.coerceIn(1, hardCaps[ch] ?: 200)
+        userCaps[ch] = v
+        val cur = _strengths.value[ch] ?: 0
+        if (cur > v) _strengths.value = _strengths.value + (ch to v)
+        publishCaps()
+    }
+
+    private fun publishCaps() {
+        _caps.value = mapOf("A" to capFor("A"), "B" to capFor("B"))
+    }
 
     /** 应用一批 AI 动作；返回执行/丢弃记录。 */
     suspend fun apply(actions: List<DeviceAction>): Pair<List<Executed>, List<Dropped>> {
@@ -57,7 +81,7 @@ class Safety(private val device: DeviceOps) {
                         dropped += Dropped("缺少通道或数值")
                         continue
                     }
-                    val cap = caps[ch] ?: 100
+                    val cap = capFor(ch)
                     val cur = _strengths.value[ch] ?: 0
                     if (abs(v - cur) > MAX_STEP) {
                         dropped += Dropped("$ch 单次变化 ${abs(v - cur)} 超过 $MAX_STEP")
@@ -79,7 +103,7 @@ class Safety(private val device: DeviceOps) {
                         dropped += Dropped("缺少 delta")
                         continue
                     }
-                    val cap = caps[ch] ?: 100
+                    val cap = capFor(ch)
                     val cur = _strengths.value[ch] ?: 0
                     val clamped = max(0, min(cap, cur + delta))
                     _strengths.value = _strengths.value + (ch to clamped)

@@ -42,7 +42,7 @@ data class ScanDevice(val name: String?, val address: String, val rssi: Int)
  * - 服务 0x180C / 写 0x150A / 通知 0x150B；电量 0x180A / 0x1500
  * - B0 指令：每 100ms 一条 20 字节帧（两通道强度 + 各 4 组频率/强度波形数据）
  * - BF 指令：软上限 + 平衡参数，重连后必须重写（官方警告，断电保存）
- * - 强度：UI 0-100 → 设备 0-200（×2，对齐官方 App 手感），绝对设置方式 0b11
+ * - 强度：UI 0-200 直出设备 0-200（郊狼满值 200，对齐桌面版），绝对设置方式 0b11
  */
 @SuppressLint("MissingPermission") // 运行时权限由 UI 层保证
 class BleCoyote(
@@ -408,12 +408,12 @@ class BleCoyote(
         var seq = 0
         if (a.dirty) {
             mode = mode or (0b11 shl 2) // A 高两位 = 绝对
-            out[2] = (a.strength * 2).coerceIn(0, 200).toByte()
+            out[2] = (a.strength).coerceIn(0, 200).toByte()
             seq = 1
         }
         if (b.dirty) {
             mode = mode or 0b11 // B 低两位 = 绝对
-            out[3] = (b.strength * 2).coerceIn(0, 200).toByte()
+            out[3] = (b.strength).coerceIn(0, 200).toByte()
             seq = 1
         }
         out[1] = ((seq shl 4) or mode).toByte()

@@ -19,6 +19,7 @@ import com.indhg.aiforcoyote.game.Safety
 import com.indhg.aiforcoyote.game.ScanDevice
 import com.indhg.aiforcoyote.game.parseAction
 import com.indhg.aiforcoyote.llm.DeepSeekClient
+import com.indhg.aiforcoyote.llm.Roles
 import com.indhg.aiforcoyote.llm.SystemPrompt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,12 +42,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val deviceState: StateFlow<DeviceState> = ble.state
     val scanDevices: StateFlow<List<ScanDevice>> = ble.scanDevices
+    val caps: StateFlow<Map<String, Int>> = safety.caps
 
-    // M2：观察闭环（摄像头截帧 + 麦克风音量分级）
+    // M2：观察闭环（摄像头截帧 + 麦克风音量分级）+ 独立开关
     private val camera = CameraObserver(app)
     private val audio = AudioObserver(app, viewModelScope, onMoan = { kind, _ -> addNote(moanText(kind)) })
     val cameraState: StateFlow<CameraState> = camera.state
     val audioState: StateFlow<AudioState> = audio.state
+    private val _camSwitch = MutableStateFlow(true)
+    val camSwitch: StateFlow<Boolean> = _camSwitch.asStateFlow()
+    private val _micSwitch = MutableStateFlow(true)
+    val micSwitch: StateFlow<Boolean> = _micSwitch.asStateFlow()
+    private var observing = false
+    private var lastOwner: LifecycleOwner? = null
     private val notes = mutableListOf<String>()
     private var rageRounds = 0
     private val _rage = MutableStateFlow(0)
@@ -71,9 +79,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast.asStateFlow()
 
-    // DLC：调教版提示词是否已导入（导入后写 filesDir/dlc/）
-    private val _dlcInstalled = MutableStateFlow(dlcFileExists())
-    val dlcInstalled: StateFlow<Boolean> = _dlcInstalled.asStateFlow()
+    // DLC：主题/风格档可用性（导入后写 filesDir/dlc/；dlcRefresh 供 UI 触发重算）
+    private val _dlcRefresh = MutableStateFlow(0)
+    val dlcRefresh: StateFlow<Int> = _dlcRefresh.asStateFlow()
+
+    /** 主题可用性：至少一个风格档已装。 */
+    fun roleUsable(role: String): Boolean {
+        val app = getApplication<Application>()
+        return Roles.find(role)?.usable(app) == true
+    }
+
+    /** 风格档可用性：本体资产恒可用；DLC 看文件是否存在。 */
+    fun profileAvailable(role: String, profile: String): Boolean {
+        val app = getApplication<Application>()
+        return Roles.find(role)?.profiles?.firstOrNull { it.name == profile }?.available(app) == true
+    }
 
     private val history = mutableListOf<Pair<String, String>>()
     private var loopJob: Job? = null
@@ -104,28 +124,70 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ble.disconnect()
     }
 
-    /** 前台开始观察（摄像头 + 麦克风）；权限缺失的自动降级不崩溃。 */
+    /** 前台开始观察（摄像头 + 麦克风，各自受开关控制）；权限缺失的自动降级不崩溃。 */
     fun startObservation(owner: LifecycleOwner) {
-        camera.start(owner)
-        audio.start()
+        observing = true
+        lastOwner = owner
+        if (_camSwitch.value) camera.start(owner)
+        if (_micSwitch.value) audio.start()
+    }
+
+    /** 摄像头独立开关（观察进行中时立即生效）。 */
+    fun setCamSwitch(on: Boolean) {
+        _camSwitch.value = on
+        if (!observing) return
+        val owner = lastOwner ?: return
+        if (on) camera.start(owner) else camera.stop()
+    }
+
+    /** 麦克风独立开关（观察进行中时立即生效）。 */
+    fun setMicSwitch(on: Boolean) {
+        _micSwitch.value = on
+        if (!observing) return
+        if (on) audio.start() else audio.stop()
+    }
+
+    /** 调通道强度上限（1~200，不持久化）。 */
+    fun setChannelCap(ch: String, value: Int) {
+        safety.setUserCap(ch, value)
+    }
+
+    /** 切换主题/风格档（未安装拦截 + 提示）。 */
+    fun setRoleProfile(role: String, profile: String) {
+        if (!roleUsable(role)) {
+            _toast.value = "「${Roles.find(role)?.name ?: role}」未安装：先导入对应 DLC 包"
+            return
+        }
+        if (!profileAvailable(role, profile)) {
+            _toast.value = "该风格未安装：先导入对应 DLC 包"
+            return
+        }
+        updateSettings { it.copy(role = role, profile = profile) }
     }
 
     /** 调教版 DLC：导入 zip 包（解出全部 .md）或单个 .md 到应用私有目录。 */
     fun importDlc(uri: Uri): Boolean {
         return try {
             val app = getApplication<Application>()
+            val before = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
             val name = queryDisplayName(uri)
             val ok = if (name?.endsWith(".zip", ignoreCase = true) == true) {
                 importDlcZip(app, uri)
             } else {
                 importDlcMd(app, uri)
             }
-            if (ok && dlcFile().exists()) {
-                _dlcInstalled.value = true
-                _toast.value = "调教版已导入，可在「对话风格」切换"
+            _dlcRefresh.value++
+            val after = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
+            val newRoles = (after - before).toList()
+            if (ok && after.isNotEmpty()) {
+                _toast.value = if (newRoles.isNotEmpty()) {
+                    "已导入：新主题「${newRoles.joinToString("、")}」可用"
+                } else {
+                    "导入完成，风格档已可用"
+                }
                 true
             } else {
-                _toast.value = "导入完成，但没找到提示词文件（触手-角色提示词-调教.md）"
+                _toast.value = "导入完成，但没找到提示词文件（触手-角色提示词-调教.md / 品评会-角色提示词-调教.md）"
                 false
             }
         } catch (e: Exception) {
@@ -179,7 +241,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun dlcFile(): java.io.File =
-        java.io.File(getApplication<Application>().filesDir, SystemPrompt.DLC_PROMPT_REL)
+        java.io.File(getApplication<Application>().filesDir, Roles.DLC1_PROMPT_REL)
 
     private fun dlcFileExists(): Boolean = dlcFile().exists()
 
@@ -247,7 +309,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _rage.value = rageRounds
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
             val system = SystemPrompt.build(
-                getApplication(), s.profile, s.nick,
+                getApplication(), s.role, s.profile, s.nick,
                 cameraEnabled = cs.enabled,
                 rageRounds = rageRounds,
                 notes = notes.toList(),

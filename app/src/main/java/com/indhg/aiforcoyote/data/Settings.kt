@@ -16,6 +16,7 @@ data class Settings(
     val baseUrl: String = "https://api.deepseek.com",
     val model: String = "deepseek-v4-flash-vision-exp",
     val nick: String = "小柳",
+    val role: String = "触手",
     val profile: String = "纯爱",
     val autopilot: Boolean = true,
 )
@@ -28,6 +29,7 @@ class SettingsRepository(private val context: Context) {
             baseUrl = p[KEY_BASE_URL] ?: "https://api.deepseek.com",
             model = p[KEY_MODEL] ?: "deepseek-v4-flash-vision-exp",
             nick = p[KEY_NICK] ?: "小柳",
+            role = p[KEY_ROLE] ?: "触手",
             profile = p[KEY_PROFILE] ?: "纯爱",
             autopilot = p[KEY_AUTOPILOT] ?: true,
         )
@@ -40,6 +42,7 @@ class SettingsRepository(private val context: Context) {
             p[KEY_BASE_URL] = next.baseUrl
             p[KEY_MODEL] = next.model
             p[KEY_NICK] = next.nick
+            p[KEY_ROLE] = next.role
             p[KEY_PROFILE] = next.profile
             p[KEY_AUTOPILOT] = next.autopilot
         }
@@ -50,6 +53,7 @@ class SettingsRepository(private val context: Context) {
         val KEY_BASE_URL = stringPreferencesKey("base_url")
         val KEY_MODEL = stringPreferencesKey("model")
         val KEY_NICK = stringPreferencesKey("nick")
+        val KEY_ROLE = stringPreferencesKey("role")
         val KEY_PROFILE = stringPreferencesKey("profile")
         val KEY_AUTOPILOT = booleanPreferencesKey("autopilot")
     }

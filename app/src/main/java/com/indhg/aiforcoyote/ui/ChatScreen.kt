@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.indhg.aiforcoyote.MainViewModel
 import com.indhg.aiforcoyote.UiMsg
+import com.indhg.aiforcoyote.llm.Roles
 import com.indhg.aiforcoyote.ui.theme.Bad
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
@@ -109,7 +110,13 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Coyote in Cradle", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
                 Text(
-                    if (settings.profile == "纯爱") "纯爱版 · 温柔驯服" else "调教版 · 支配胁迫",
+                    buildString {
+                        append(settings.role)
+                        append(" · ")
+                        val role = Roles.find(settings.role)
+                        val prof = role?.profiles?.firstOrNull { it.name == settings.profile }
+                        append(if (prof != null) Roles.LEVEL_LABELS[prof.level] ?: settings.profile else settings.profile)
+                    },
                     fontSize = 12.sp,
                     color = Muted,
                 )

@@ -1,9 +1,14 @@
 package com.indhg.aiforcoyote.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -81,7 +86,7 @@ private fun roleAvatarRes(role: String): Int = when (role) {
 }
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenPicker: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val dlcRefresh by vm.dlcRefresh.collectAsState()
     var apiKey by remember { mutableStateOf("") }
@@ -89,6 +94,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenPicker: () -> Un
     var model by remember { mutableStateOf(settings.model) }
     var nick by remember { mutableStateOf(settings.nick) }
     var status by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    // 调起系统文件管理选文件（vivo/小米等各自文件管理的分类页），多选 zip/md
+    val pickLauncher = rememberLauncherForActivityResult(DlcPickContract()) { uris ->
+        if (uris.isNotEmpty()) vm.importDlcUris(uris)
+    }
 
     val inputColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = Gold,
@@ -177,7 +186,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenPicker: () -> Un
             vm = vm,
             role = settings.role,
             profile = settings.profile,
-            onImport = onOpenPicker,
+            onImport = { pickLauncher.launch(Unit) },
         )
 
         Text("称谓（AI 怎么叫你）", fontSize = 13.sp, color = Muted)
@@ -355,7 +364,7 @@ private fun ThemeCard(
                         onImport()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("导入 DLC（文件管理器）", fontSize = 12.sp, color = Muted) }
+                ) { Text("导入 DLC（打开文件管理）", fontSize = 12.sp, color = Muted) }
             }
         }
     }
@@ -495,4 +504,38 @@ private fun DeviceSection(vm: MainViewModel) {
     }
     Spacer(Modifier.height(4.dp))
     Text("蓝牙直连脉冲主机，无需郊狼 App 与中继。", fontSize = 11.sp, color = Faint)
+}
+
+/**
+ * 调起系统文件管理选文件（ACTION_GET_CONTENT）：
+ * vivo/小米/华为等会弹出各自文件管理的分类页（图片/压缩包等），原生安卓弹系统文档页；支持多选。
+ */
+private class DlcPickContract : ActivityResultContract<Unit, List<Uri>>() {
+    override fun createIntent(context: Context, input: Unit): Intent =
+        Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf(
+                    "application/zip",
+                    "application/x-zip-compressed",
+                    "application/octet-stream",
+                    "text/markdown",
+                    "text/x-markdown",
+                    "text/plain",
+                ),
+            )
+        }
+
+    override fun parseResult(resultCode: Int, intent: Intent?): List<Uri> {
+        if (resultCode != Activity.RESULT_OK || intent == null) return emptyList()
+        val clip = intent.clipData
+        return when {
+            clip != null -> (0 until clip.itemCount).map { clip.getItemAt(it).uri }
+            intent.data != null -> listOf(intent.data!!)
+            else -> emptyList()
+        }
+    }
 }

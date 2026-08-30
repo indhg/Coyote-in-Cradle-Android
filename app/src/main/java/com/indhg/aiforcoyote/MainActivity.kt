@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.indhg.aiforcoyote.ui.ChatScreen
-import com.indhg.aiforcoyote.ui.FilePickerScreen
 import com.indhg.aiforcoyote.ui.SettingsScreen
 import com.indhg.aiforcoyote.ui.theme.CoyoteTheme
 
@@ -53,15 +52,10 @@ class MainActivity : ComponentActivity() {
             CoyoteTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var showSettings by remember { mutableStateOf(false) }
-                    var showPicker by remember { mutableStateOf(false) }
-                    when {
-                        showPicker -> FilePickerScreen(vm = vm, onBack = { showPicker = false })
-                        showSettings -> SettingsScreen(
-                            vm = vm,
-                            onBack = { showSettings = false },
-                            onOpenPicker = { showPicker = true },
-                        )
-                        else -> ChatScreen(vm = vm, onOpenSettings = { showSettings = true })
+                    if (showSettings) {
+                        SettingsScreen(vm = vm, onBack = { showSettings = false })
+                    } else {
+                        ChatScreen(vm = vm, onOpenSettings = { showSettings = true })
                     }
                 }
             }

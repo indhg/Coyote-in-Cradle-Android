@@ -165,35 +165,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         updateSettings { it.copy(role = role, profile = profile) }
     }
 
-    /** 调教版 DLC：导入 zip 包（解出全部 .md）或单个 .md 到应用私有目录。 */
-    fun importDlc(uri: Uri): Boolean {
-        return try {
-            val app = getApplication<Application>()
-            val before = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
-            val name = queryDisplayName(uri)
-            val ok = if (name?.endsWith(".zip", ignoreCase = true) == true) {
-                importDlcZip(app, uri)
-            } else {
-                importDlcMd(app, uri)
+    /** 调教版 DLC：导入单个文件（zip 解出全部 .md / 单 md 按真实文件名）。分享入口用。 */
+    fun importDlc(uri: Uri): Boolean = importDlcUris(listOf(uri))
+
+    /** 多选导入：逐个导入并汇总结果（失败项在 toast 中列出）。 */
+    fun importDlcUris(uris: List<Uri>): Boolean {
+        if (uris.isEmpty()) return false
+        val app = getApplication<Application>()
+        val before = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
+        val failures = mutableListOf<String>()
+        for (uri in uris) {
+            val display = queryDisplayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: "未知文件"
+            val reason = try {
+                if (display.endsWith(".zip", ignoreCase = true)) importDlcZip(app, uri)
+                else importDlcMd(app, uri)
+            } catch (e: Exception) {
+                "异常（${e.message}）"
             }
-            _dlcRefresh.value++
-            val after = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
-            val newRoles = (after - before).toList()
-            if (ok && after.isNotEmpty()) {
-                _toast.value = if (newRoles.isNotEmpty()) {
-                    "已导入：新主题「${newRoles.joinToString("、")}」可用"
-                } else {
-                    "导入完成，风格档已可用"
-                }
-                true
-            } else {
-                _toast.value = "导入完成，但没找到提示词文件（触手-角色提示词-调教.md / 品评会-角色提示词-调教.md）"
-                false
-            }
-        } catch (e: Exception) {
-            _toast.value = "导入失败：${e.message}"
-            false
+            if (reason != null) failures += "$display：$reason"
         }
+        _dlcRefresh.value++
+        val after = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
+        val newRoles = (after - before).toList()
+        _toast.value = when {
+            failures.isNotEmpty() -> "导入完成，失败 ${failures.size} 项：${failures.joinToString("；")}"
+            newRoles.isNotEmpty() -> "已导入：新主题「${newRoles.joinToString("、")}」可用"
+            else -> "导入完成，风格档已可用"
+        }
+        return failures.isEmpty()
     }
 
     private fun queryDisplayName(uri: Uri): String? {
@@ -209,9 +208,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** zip 包：解出全部 .md（去掉目录层级，保留文件名）。 */
-    private fun importDlcZip(app: Application, uri: Uri): Boolean {
-        val dir = dlcFile().parentFile ?: return false
+    /** zip 包：解出全部 .md（去掉目录层级，保留文件名）。返回 null=成功 / 失败原因。 */
+    private fun importDlcZip(app: Application, uri: Uri): String? {
+        val dir = dlcDir()
         dir.mkdirs()
         var foundMd = false
         app.contentResolver.openInputStream(uri)?.use { ins ->
@@ -227,18 +226,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     entry = zip.nextEntry
                 }
             }
-        } ?: return false
-        return foundMd
+        } ?: return "无法读取文件"
+        return if (foundMd) null else "包里没有 .md 提示词文件"
     }
 
-    private fun importDlcMd(app: Application, uri: Uri): Boolean {
-        val target = dlcFile()
+    /** 单 md：按真实文件名落盘，仅接受已登记主题的提示词文件名。返回 null=成功 / 失败原因。 */
+    private fun importDlcMd(app: Application, uri: Uri): String? {
+        val name = (queryDisplayName(uri) ?: uri.lastPathSegment)?.substringAfterLast('/') ?: return "无法读取文件名"
+        val known = Roles.ALL.flatMap { it.profiles }.mapNotNull { it.dlcRel?.substringAfterLast('/') }
+        if (name !in known) return "未识别的提示词文件（支持：${known.joinToString(" / ")}）"
+        val target = java.io.File(dlcDir(), name)
         target.parentFile?.mkdirs()
         app.contentResolver.openInputStream(uri)?.use { ins ->
             target.outputStream().use { out -> ins.copyTo(out) }
-        } ?: return false
-        return true
+        } ?: return "无法读取文件"
+        return null
     }
+
+    private fun dlcDir(): java.io.File =
+        java.io.File(getApplication<Application>().filesDir, Roles.DLC_DIR)
 
     private fun dlcFile(): java.io.File =
         java.io.File(getApplication<Application>().filesDir, Roles.DLC1_PROMPT_REL)

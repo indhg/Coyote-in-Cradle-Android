@@ -81,7 +81,7 @@ private fun roleAvatarRes(role: String): Int = when (role) {
 }
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenPicker: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val dlcRefresh by vm.dlcRefresh.collectAsState()
     var apiKey by remember { mutableStateOf("") }
@@ -89,9 +89,6 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     var model by remember { mutableStateOf(settings.model) }
     var nick by remember { mutableStateOf(settings.nick) }
     var status by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { vm.importDlc(it) }
-    }
 
     val inputColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = Gold,
@@ -180,11 +177,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             vm = vm,
             role = settings.role,
             profile = settings.profile,
-            onImport = {
-                importLauncher.launch(
-                    arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "text/markdown", "text/plain"),
-                )
-            },
+            onImport = onOpenPicker,
         )
 
         Text("称谓（AI 怎么叫你）", fontSize = 13.sp, color = Muted)
@@ -362,7 +355,7 @@ private fun ThemeCard(
                         onImport()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("导入 DLC（.zip 或 .md）", fontSize = 12.sp, color = Muted) }
+                ) { Text("导入 DLC（文件管理器）", fontSize = 12.sp, color = Muted) }
             }
         }
     }

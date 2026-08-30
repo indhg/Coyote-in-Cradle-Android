@@ -19,6 +19,7 @@ data class Settings(
     val role: String = "触手",
     val profile: String = "纯爱",
     val autopilot: Boolean = true,
+    val jsonMode: Boolean = true,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -32,6 +33,7 @@ class SettingsRepository(private val context: Context) {
             role = p[KEY_ROLE] ?: "触手",
             profile = p[KEY_PROFILE] ?: "纯爱",
             autopilot = p[KEY_AUTOPILOT] ?: true,
+            jsonMode = p[KEY_JSON_MODE] ?: true,
         )
     }
 
@@ -45,6 +47,7 @@ class SettingsRepository(private val context: Context) {
             p[KEY_ROLE] = next.role
             p[KEY_PROFILE] = next.profile
             p[KEY_AUTOPILOT] = next.autopilot
+            p[KEY_JSON_MODE] = next.jsonMode
         }
     }
 
@@ -56,5 +59,6 @@ class SettingsRepository(private val context: Context) {
         val KEY_ROLE = stringPreferencesKey("role")
         val KEY_PROFILE = stringPreferencesKey("profile")
         val KEY_AUTOPILOT = booleanPreferencesKey("autopilot")
+        val KEY_JSON_MODE = booleanPreferencesKey("json_mode")
     }
 }

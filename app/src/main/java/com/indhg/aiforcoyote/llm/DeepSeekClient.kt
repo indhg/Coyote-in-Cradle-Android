@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -64,8 +65,7 @@ class DeepSeekClient {
                 if (resp.isSuccessful) {
                     Result.success("连接成功，模型可用")
                 } else {
-                    val err = resp.body?.string()?.take(300) ?: ""
-                    Result.failure(IOException("HTTP ${resp.code}: $err"))
+                    Result.failure(friendlyError(resp.code))
                 }
             } catch (e: Exception) {
                 Result.failure(e)
@@ -76,6 +76,7 @@ class DeepSeekClient {
      * 一轮对话。
      * @param history 历史（用户消息, AI 台词）对，不包含本轮。
      * @param imageB64 本轮注入的摄像头帧（JPEG base64，可空）。
+     * @param jsonMode 是否请求 json_object（部分中转站不支持，关闭后程序有兜底解析；400 时也会自动降级重试）。
      */
     suspend fun chat(
         baseUrl: String,
@@ -84,23 +85,26 @@ class DeepSeekClient {
         system: String,
         history: List<Pair<String, String>>,
         imageB64: String? = null,
+        jsonMode: Boolean = true,
     ): LlmTurn = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
+        var degraded = false // 400 时已自动去掉 response_format 重试过
         for (round in 1..MAX_ROUNDS) {
             val sys = if (round == 1) system else system + ROUND_WARNING
             val temperature = if (round == 1) 1.0 else 0.0
             try {
                 val msgs = buildMessages(sys, history, imageB64)
-                val body = JsonObject(
-                    mapOf(
-                        "model" to JsonPrimitive(model),
-                        "messages" to msgs,
-                        "temperature" to JsonPrimitive(temperature),
-                        "max_tokens" to JsonPrimitive(1500),
-                        // 与桌面版一致：json_mode 输出（大幅降低格式错误）
-                        "response_format" to JsonObject(mapOf("type" to JsonPrimitive("json_object"))),
-                    )
-                ).toString()
+                val fields = mutableMapOf<String, JsonElement>(
+                    "model" to JsonPrimitive(model),
+                    "messages" to msgs,
+                    "temperature" to JsonPrimitive(temperature),
+                    "max_tokens" to JsonPrimitive(1500),
+                )
+                // 与桌面版一致：json_mode 输出（大幅降低格式错误）；中转站不支持时可关
+                if (jsonMode && !degraded) {
+                    fields["response_format"] = JsonObject(mapOf("type" to JsonPrimitive("json_object")))
+                }
+                val body = JsonObject(fields).toString()
                 val resp = http.newCall(
                     Request.Builder()
                         .url(baseUrl.trimEnd('/') + "/chat/completions")
@@ -110,8 +114,15 @@ class DeepSeekClient {
                         .build()
                 ).execute()
                 if (!resp.isSuccessful) {
+                    val code = resp.code
                     val err = resp.body?.string()?.take(300) ?: ""
-                    lastError = IOException("HTTP ${resp.code}: $err")
+                    if (code == 400 && jsonMode && !degraded) {
+                        // 中转站/部分服务商不支持 json_object：自动降级重试一次
+                        degraded = true
+                        lastError = IOException("HTTP 400（不支持 JSON 模式，已自动降级重试）")
+                    } else {
+                        lastError = friendlyError(code)
+                    }
                 } else {
                     val root = json.parseToJsonElement(resp.body!!.string()).jsonObject
                     val message = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonObject
@@ -202,6 +213,13 @@ class DeepSeekClient {
             }
         }
         return null
+    }
+
+    /** 把常见 HTTP 错误翻译成人话（官方与中转站密钥不通用、中转站不支持 JSON 模式等）。 */
+    private fun friendlyError(code: Int): IOException = when (code) {
+        401 -> IOException("API Key 无效或未填：官方与中转站的密钥不通用，请确认 Base URL 与密钥配套")
+        400 -> IOException("请求参数不被支持（中转站常见）：请核对模型名，或关闭 JSON 模式")
+        else -> IOException("HTTP $code")
     }
 
     private companion object {

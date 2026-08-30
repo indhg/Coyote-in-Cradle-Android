@@ -327,7 +327,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 rageRounds = rageRounds,
                 notes = notes.toList(),
             )
-            val result = client.chat(s.baseUrl, s.apiKey, s.model, system, history.toList(), img)
+            val result = client.chat(
+                s.baseUrl, s.apiKey, s.model, system, history.toList(), img,
+                jsonMode = s.jsonMode,
+            )
             val actions = result.actions.map { parseAction(it) }
             val (executed, dropped) = safety.apply(actions)
             // M3：双通道保底——记录每通道最近调整轮次并自动修复

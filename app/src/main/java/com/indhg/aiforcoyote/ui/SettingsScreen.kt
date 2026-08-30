@@ -152,6 +152,26 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             label = { Text("模型名", fontSize = 12.sp) },
             colors = inputColors,
         )
+        // JSON 模式开关：中转站不支持 json_object 时关闭（程序有兜底解析，400 也会自动降级重试）
+        var jsonMode by remember { mutableStateOf(settings.jsonMode) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("JSON 模式", fontSize = 13.sp, color = Muted)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "要求模型输出严格 JSON；部分中转站不支持可关",
+                fontSize = 10.sp,
+                color = Faint,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = jsonMode,
+                onCheckedChange = { jsonMode = it },
+                colors = SwitchDefaults.colors(checkedThumbColor = Ink, checkedTrackColor = Gold),
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = {
@@ -165,7 +185,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                 onClick = {
                     val key = apiKey.ifBlank { settings.apiKey }
                     vm.updateSettings {
-                        it.copy(apiKey = key, baseUrl = baseUrl.ifBlank { it.baseUrl }, model = model.ifBlank { it.model })
+                        it.copy(
+                            apiKey = key,
+                            baseUrl = baseUrl.ifBlank { it.baseUrl },
+                            model = model.ifBlank { it.model },
+                            jsonMode = jsonMode,
+                        )
                     }
                     apiKey = ""
                     status = "已保存（立即生效）" to true

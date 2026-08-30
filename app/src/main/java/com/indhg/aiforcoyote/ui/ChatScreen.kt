@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,6 +77,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
     var input by remember { mutableStateOf("") }
+    var showClearConfirm by remember { mutableStateOf(false) }
 
     val pairLabel = when (device.status) {
         "connected" -> "郊狼已连接" + (device.battery?.let { " $it%" } ?: "")
@@ -121,6 +123,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     color = Muted,
                 )
             }
+            TextButton(onClick = { showClearConfirm = true }) { Text("清空", color = Muted) }
             TextButton(onClick = onOpenSettings) { Text("设置", color = Muted) }
         }
 
@@ -266,6 +269,22 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 .navigationBarsPadding()
                 .padding(bottom = 8.dp),
         )
+
+        if (showClearConfirm) {
+            AlertDialog(
+                onDismissRequest = { showClearConfirm = false },
+                title = { Text("清空对话历史？", fontSize = 16.sp, color = TextMain) },
+                text = { Text("将清空聊天记录与 AI 的记忆上下文，设备强度不受影响。", fontSize = 13.sp, color = Muted) },
+                confirmButton = {
+                    TextButton(onClick = { showClearConfirm = false; vm.clearHistory() }) {
+                        Text("清空", color = Bad)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearConfirm = false }) { Text("取消", color = Muted) }
+                },
+            )
+        }
     }
 }
 

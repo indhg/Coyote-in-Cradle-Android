@@ -266,6 +266,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _toast.value = null
     }
 
+    /** 清空对话历史（界面消息 + 模型上下文）。 */
+    fun clearHistory() {
+        _messages.value = emptyList()
+        history.clear()
+        _toast.value = "对话历史已清空"
+    }
+
     fun updateSettings(transform: (Settings) -> Settings) {
         viewModelScope.launch { repo.update(transform) }
     }

@@ -9,7 +9,7 @@ import kotlin.math.min
 
 /**
  * 安全层：任何来源（AI/手动）命令的唯一出口。
- * 复刻桌面版 safety.py：每通道上限 100、单次变化 ≤40、过热降 20、断开清零。
+ * 复刻桌面版 safety.py：每通道硬上限 200、运行时上限默认 100、单次变化 ≤40、过热降 20、断开清零。
  */
 class Safety(private val device: DeviceOps) {
 

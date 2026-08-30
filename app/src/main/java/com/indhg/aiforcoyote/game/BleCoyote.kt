@@ -68,7 +68,7 @@ class BleCoyote(
 
     // ---------- 每通道运行时状态 ----------
     private class ChState {
-        var strength = 0                 // UI 0-100
+        var strength = 0                 // UI 0-200（郊狼满值 200，对齐桌面版）
         var dirty = true                 // 强度待下发
         var frames: List<String> = emptyList()  // 官方波形帧（8 hex/帧）
         var idx = 0                      // 流式游标（每 B0 前进 2 帧）
@@ -453,13 +453,13 @@ class BleCoyote(
         val c = channels[ch] ?: return false
         when (op) {
             "hold_strength", "temp_strength" -> {
-                c.strength = (value ?: 0).coerceIn(0, 100)
+                c.strength = (value ?: 0).coerceIn(0, 200)
                 c.dirty = true
                 if (op == "temp_strength") scheduleTempRevert(ch, (durationS ?: 3).coerceIn(1, 30))
             }
             "add_strength" -> {
                 val delta = value ?: return false
-                c.strength = (c.strength + delta).coerceIn(0, 100)
+                c.strength = (c.strength + delta).coerceIn(0, 200)
                 c.dirty = true
             }
             "pulse_hold", "pulse" -> {

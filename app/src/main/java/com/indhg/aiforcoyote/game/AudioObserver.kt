@@ -127,6 +127,8 @@ class AudioObserver(
     fun stop() {
         job?.cancel()
         job = null
+        // 停止后立即清状态：避免「开关已关但 silent 仍为 true」导致怒气值误积累
+        _state.value = _state.value.copy(running = false, enabled = false, silent = false)
     }
 
     private fun processWindow(window: ShortArray) {

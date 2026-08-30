@@ -372,7 +372,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             if (turnCount - (lastStrength[ch] ?: 0) >= 2) {
-                val delta = if (strength < 100) 5 else -5
+                val delta = if (strength < safety.capFor(ch)) 5 else -5
                 safety.apply(listOf(DeviceAction("add_strength", ch, delta, null, null)))
                 lastStrength[ch] = turnCount
                 fixed = true

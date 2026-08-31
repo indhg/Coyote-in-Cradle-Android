@@ -20,6 +20,7 @@ data class Settings(
     val profile: String = "纯爱",
     val autopilot: Boolean = true,
     val jsonMode: Boolean = true,
+    val checkUpdate: Boolean = true,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -34,6 +35,7 @@ class SettingsRepository(private val context: Context) {
             profile = p[KEY_PROFILE] ?: "纯爱",
             autopilot = p[KEY_AUTOPILOT] ?: true,
             jsonMode = p[KEY_JSON_MODE] ?: true,
+            checkUpdate = p[KEY_CHECK_UPDATE] ?: true,
         )
     }
 
@@ -48,6 +50,7 @@ class SettingsRepository(private val context: Context) {
             p[KEY_PROFILE] = next.profile
             p[KEY_AUTOPILOT] = next.autopilot
             p[KEY_JSON_MODE] = next.jsonMode
+            p[KEY_CHECK_UPDATE] = next.checkUpdate
         }
     }
 
@@ -60,5 +63,6 @@ class SettingsRepository(private val context: Context) {
         val KEY_PROFILE = stringPreferencesKey("profile")
         val KEY_AUTOPILOT = booleanPreferencesKey("autopilot")
         val KEY_JSON_MODE = booleanPreferencesKey("json_mode")
+        val KEY_CHECK_UPDATE = booleanPreferencesKey("check_update")
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -200,6 +201,45 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
         status?.let { (msg, ok) ->
             Text(msg, fontSize = 12.sp, color = if (ok) Gold else Color(0xFFE06C5A))
+        }
+
+        // 更新检测：进设置页查一次 + 开关 + 发现新版本跳 GitHub
+        val updateInfo by vm.updateInfo.collectAsState()
+        val context = LocalContext.current
+        LaunchedEffect(Unit) { vm.refreshUpdate() }
+        Text("更新", fontSize = 13.sp, color = Muted)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                if (updateInfo.available && updateInfo.url.isNotBlank()) {
+                    Text(
+                        "发现新版本 ${updateInfo.latest}，点击下载",
+                        fontSize = 12.sp,
+                        color = Gold,
+                        modifier = Modifier.clickable {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.url)))
+                        },
+                    )
+                } else {
+                    Text(
+                        if (updateInfo.latest.isNotBlank()) "已是最新（${updateInfo.latest}）" else "尚未检查到更新",
+                        fontSize = 12.sp,
+                        color = Faint,
+                    )
+                }
+            }
+            Text("自动检查", fontSize = 11.sp, color = Muted)
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = settings.checkUpdate,
+                onCheckedChange = { on ->
+                    vm.updateSettings { it.copy(checkUpdate = on) }
+                    if (on) vm.refreshUpdate()
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = Ink, checkedTrackColor = Gold),
+            )
         }
 
         Spacer(Modifier.height(4.dp))

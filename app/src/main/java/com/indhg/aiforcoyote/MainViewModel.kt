@@ -83,6 +83,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _dlcRefresh = MutableStateFlow(0)
     val dlcRefresh: StateFlow<Int> = _dlcRefresh.asStateFlow()
 
+    // 更新检测：静默查 GitHub 最新版本（失败为空结果，不打扰）
+    private val _updateInfo = MutableStateFlow(UpdateInfo())
+    val updateInfo: StateFlow<UpdateInfo> = _updateInfo.asStateFlow()
+
+    /** 检查更新（开关开着才查）；进入设置页时由 UI 调用。 */
+    fun refreshUpdate() {
+        if (!_settings.value.checkUpdate) return
+        viewModelScope.launch {
+            _updateInfo.value = UpdateChecker.check(BuildConfig.VERSION_NAME)
+        }
+    }
+
     /** 主题可用性：至少一个风格档已装。 */
     fun roleUsable(role: String): Boolean {
         val app = getApplication<Application>()
@@ -107,6 +119,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch { restartLoop() }
+        // 启动 5 秒后静默查一次更新（开关开着才生效）
+        viewModelScope.launch {
+            delay(5000)
+            refreshUpdate()
+        }
 
         // BLE 直连郊狼（断开时安全层自动清零）
         safetyRef = safety

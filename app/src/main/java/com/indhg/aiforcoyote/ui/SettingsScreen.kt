@@ -161,7 +161,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             Text("JSON 模式", fontSize = 13.sp, color = Muted)
             Spacer(Modifier.width(8.dp))
             Text(
-                "要求模型输出严格 JSON；部分中转站不支持可关",
+                "部分中转站不兼容，可关闭",
                 fontSize = 10.sp,
                 color = Faint,
                 modifier = Modifier.weight(1f),

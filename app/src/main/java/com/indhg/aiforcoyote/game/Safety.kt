@@ -31,6 +31,19 @@ class Safety(private val device: DeviceOps) {
             publishCaps()
         }
 
+    /** 电击强度档倍率（只乘 AI 输出；步长检查用未乘的原值）。 */
+    var intensityLevel: String = "中"
+        private set
+    private var intensityScale = 1.0
+
+    fun setIntensityLevel(level: String): String {
+        val key = level.trim()
+        val m = INTENSITY_SCALES[key] ?: return intensityLevel
+        intensityLevel = key
+        intensityScale = m
+        return intensityLevel
+    }
+
     /** 通道生效上限：min(硬上限, 用户上限, 过热 20)。 */
     fun capFor(ch: String): Int {
         val hard = hardCaps[ch] ?: 200
@@ -51,8 +64,11 @@ class Safety(private val device: DeviceOps) {
         _caps.value = mapOf("A" to capFor("A"), "B" to capFor("B"))
     }
 
-    /** 应用一批 AI 动作；返回执行/丢弃记录。 */
-    suspend fun apply(actions: List<DeviceAction>): Pair<List<Executed>, List<Dropped>> {
+    /**
+     * 应用一批动作。applyScale=true（AI 回合）时按强度档倍率修正 hold/temp/add；
+     * 通道保底/手动路径传 false，保持原值。
+     */
+    suspend fun apply(actions: List<DeviceAction>, applyScale: Boolean = true): Pair<List<Executed>, List<Dropped>> {
         val executed = mutableListOf<Executed>()
         val dropped = mutableListOf<Dropped>()
         for (a in actions) {
@@ -87,7 +103,8 @@ class Safety(private val device: DeviceOps) {
                         dropped += Dropped("$ch 单次变化 ${abs(v - cur)} 超过 $MAX_STEP")
                         continue
                     }
-                    val clamped = max(0, min(cap, v))
+                    val scaled = if (applyScale) kotlin.math.round(v * intensityScale).toInt() else v
+                    val clamped = max(0, min(cap, scaled))
                     _strengths.value = _strengths.value + (ch to clamped)
                     device.send(a.op, ch, clamped, null, a.durationS)
                     executed += Executed("$ch 强度 $clamped")
@@ -105,9 +122,10 @@ class Safety(private val device: DeviceOps) {
                     }
                     val cap = capFor(ch)
                     val cur = _strengths.value[ch] ?: 0
-                    val clamped = max(0, min(cap, cur + delta))
+                    val scaledDelta = if (applyScale) kotlin.math.round(delta * intensityScale).toInt() else delta
+                    val clamped = max(0, min(cap, cur + scaledDelta))
                     _strengths.value = _strengths.value + (ch to clamped)
-                    device.send("add_strength", ch, delta, null, null)
+                    device.send("add_strength", ch, clamped - cur, null, null)
                     executed += Executed("$ch 强度 $clamped")
                 }
                 "pulse_hold", "pulse" -> {
@@ -134,5 +152,6 @@ class Safety(private val device: DeviceOps) {
 
     companion object {
         const val MAX_STEP = 40
+        val INTENSITY_SCALES = mapOf("轻" to 0.7, "中" to 1.0, "重" to 1.3)
     }
 }

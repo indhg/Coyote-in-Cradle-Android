@@ -95,16 +95,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 主题可用性：至少一个风格档已装。 */
+    /** 入口可用性：体验版恒可用；正式角色看 content/roles 对应语言稿是否存在。 */
     fun roleUsable(role: String): Boolean {
         val app = getApplication<Application>()
-        return Roles.find(role)?.usable(app) == true
-    }
-
-    /** 风格档可用性：本体资产恒可用；DLC 看文件是否存在。 */
-    fun profileAvailable(role: String, profile: String): Boolean {
-        val app = getApplication<Application>()
-        return Roles.find(role)?.profiles?.firstOrNull { it.name == profile }?.available(app) == true
+        val lang = _settings.value.contentLang
+        return Roles.find(role)?.available(app, lang) == true
     }
 
     private val history = mutableListOf<Pair<String, String>>()
@@ -115,6 +110,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             repo.settings.collect { s ->
                 val autopilotChanged = s.autopilot != _settings.value.autopilot
                 _settings.value = s
+                safety.setIntensityLevel(s.intensityLevel)
                 if (autopilotChanged) restartLoop()
             }
         }
@@ -169,17 +165,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         safety.setUserCap(ch, value)
     }
 
-    /** 切换主题/风格档（未安装拦截 + 提示）。 */
-    fun setRoleProfile(role: String, profile: String) {
+    /** 切换角色入口（未导入拦截 + 提示）。点过任意入口后体验版「新手推荐」角标消失。 */
+    fun setRole(role: String) {
         if (!roleUsable(role)) {
-            _toast.value = "「${Roles.find(role)?.name ?: role}」未安装：先导入对应 DLC 包"
+            _toast.value = "「${Roles.find(role)?.name ?: role}」未导入：先导入对应 DLC 包"
             return
         }
-        if (!profileAvailable(role, profile)) {
-            _toast.value = "该风格未安装：先导入对应 DLC 包"
-            return
+        updateSettings { it.copy(role = role, trialBadgeSeen = true) }
+    }
+
+    /** 电击强度档（轻 ×0.7 / 中 ×1.0 / 重 ×1.3），只乘 AI 输出强度。 */
+    fun setIntensityLevel(level: String) {
+        if (level !in Roles.INTENSITY_LEVELS) return
+        updateSettings { it.copy(intensityLevel = level) }
+    }
+
+    /** 内容语言：zh 读无后缀稿，en 读 -EN.md；切语言后若当前入口不可用则回体验版。 */
+    fun setContentLang(lang: String) {
+        if (lang != Roles.LANG_ZH && lang != Roles.LANG_EN) return
+        updateSettings { cur ->
+            val next = cur.copy(contentLang = lang)
+            val still = Roles.find(cur.role)?.available(getApplication(), lang) == true
+            if (still) next else next.copy(role = "体验版")
         }
-        updateSettings { it.copy(role = role, profile = profile) }
+        _dlcRefresh.value++
     }
 
     /** 调教版 DLC：导入单个文件（zip 解出全部 .md / 单 md 按真实文件名）。分享入口用。 */
@@ -189,7 +198,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun importDlcUris(uris: List<Uri>): Boolean {
         if (uris.isEmpty()) return false
         val app = getApplication<Application>()
-        val before = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
+        val lang = _settings.value.contentLang
+        val before = Roles.ALL.filter { it.available(app, lang) }.map { it.name }.toSet()
         val failures = mutableListOf<String>()
         for (uri in uris) {
             val display = queryDisplayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: "未知文件"
@@ -202,12 +212,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (reason != null) failures += "$display：$reason"
         }
         _dlcRefresh.value++
-        val after = Roles.ALL.filter { it.usable(app) }.map { it.name }.toSet()
+        val after = Roles.ALL.filter { it.available(app, lang) }.map { it.name }.toSet()
         val newRoles = (after - before).toList()
         _toast.value = when {
             failures.isNotEmpty() -> "导入完成，失败 ${failures.size} 项：${failures.joinToString("；")}"
-            newRoles.isNotEmpty() -> "已导入：新主题「${newRoles.joinToString("、")}」可用"
-            else -> "导入完成，风格档已可用"
+            newRoles.isNotEmpty() -> "已导入：「${newRoles.joinToString("、")}」可用"
+            else -> "导入完成。若仍显示未导入，请确认是现行 DLC（无 -调教 后缀）且语言档匹配。"
         }
         return failures.isEmpty()
     }
@@ -225,48 +235,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** zip 包：解出全部 .md（去掉目录层级，保留文件名）。返回 null=成功 / 失败原因。 */
+    /**
+     * zip 包：只收下现行 DLC 文件名（`触手-角色提示词.md` / `…-EN.md`），
+     * 写入 filesDir/content/roles/。拒绝 `..` / 绝对路径；忽略旧 -调教/-凌辱 文件。
+     */
     private fun importDlcZip(app: Application, uri: Uri): String? {
-        val dir = dlcDir()
+        val dir = Roles.contentRolesDir(app)
         dir.mkdirs()
-        var foundMd = false
+        var accepted = 0
+        var skippedLegacy = 0
         app.contentResolver.openInputStream(uri)?.use { ins ->
             java.util.zip.ZipInputStream(ins).use { zip ->
                 var entry = zip.nextEntry
                 while (entry != null) {
-                    val name = entry.name.substringAfterLast('/')
-                    if (!entry.isDirectory && name.endsWith(".md", ignoreCase = true)) {
-                        java.io.File(dir, name).outputStream().use { out -> zip.copyTo(out) }
-                        foundMd = true
+                    val raw = entry.name.replace('\\', '/')
+                    val name = raw.substringAfterLast('/')
+                    val unsafe = raw.contains("..") || raw.startsWith("/") || name.isBlank()
+                    if (!entry.isDirectory && !unsafe && name.endsWith(".md", ignoreCase = true)) {
+                        when {
+                            name in Roles.KNOWN_DLC_FILES -> {
+                                java.io.File(dir, name).outputStream().use { out -> zip.copyTo(out) }
+                                accepted++
+                            }
+                            name.contains("调教") || name.contains("凌辱") || name.contains("正式") ->
+                                skippedLegacy++
+                        }
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
                 }
             }
         } ?: return "无法读取文件"
-        return if (foundMd) null else "包里没有 .md 提示词文件"
+        return when {
+            accepted > 0 -> null
+            skippedLegacy > 0 -> "这是旧档位包（-调教/-凌辱），现行 DLC 文件名无后缀。请安装 DLC-zh v0.4.1 或 DLC-en v0.4.0"
+            else -> "包里没有可识别的角色稿（需要 content/roles/<角色>-角色提示词.md）"
+        }
     }
 
-    /** 单 md：按真实文件名落盘，仅接受已登记主题的提示词文件名。返回 null=成功 / 失败原因。 */
+    /** 单 md：仅接受现行文件名，落入 content/roles。 */
     private fun importDlcMd(app: Application, uri: Uri): String? {
         val name = (queryDisplayName(uri) ?: uri.lastPathSegment)?.substringAfterLast('/') ?: return "无法读取文件名"
-        val known = Roles.ALL.flatMap { it.profiles }.mapNotNull { it.dlcRel?.substringAfterLast('/') }
-        if (name !in known) return "未识别的提示词文件（支持：${known.joinToString(" / ")}）"
-        val target = java.io.File(dlcDir(), name)
-        target.parentFile?.mkdirs()
+        if (name !in Roles.KNOWN_DLC_FILES) {
+            return "未识别的提示词文件。现行文件名如 触手-角色提示词.md / 触手-角色提示词-EN.md（无 -调教 后缀）"
+        }
+        val dir = Roles.contentRolesDir(app)
+        dir.mkdirs()
+        val target = java.io.File(dir, name)
         app.contentResolver.openInputStream(uri)?.use { ins ->
             target.outputStream().use { out -> ins.copyTo(out) }
         } ?: return "无法读取文件"
         return null
     }
-
-    private fun dlcDir(): java.io.File =
-        java.io.File(getApplication<Application>().filesDir, Roles.DLC_DIR)
-
-    private fun dlcFile(): java.io.File =
-        java.io.File(getApplication<Application>().filesDir, Roles.DLC1_PROMPT_REL)
-
-    private fun dlcFileExists(): Boolean = dlcFile().exists()
 
     /** 退后台暂停观察。 */
     fun stopObservation() {
@@ -338,8 +358,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (rage) rageRounds++ else rageRounds = 0
             _rage.value = rageRounds
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
+            if (!roleUsable(s.role)) {
+                _toast.value = "「${s.role}」未导入，已切回体验版"
+                updateSettings { it.copy(role = "体验版") }
+                _busy.value = false
+                return
+            }
             val system = SystemPrompt.build(
-                getApplication(), s.role, s.profile, s.nick,
+                getApplication(), s.role, s.nick,
+                lang = s.contentLang,
                 cameraEnabled = cs.enabled,
                 rageRounds = rageRounds,
                 notes = notes.toList(),
@@ -387,24 +414,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             var fixed = false
             if (turnCount >= 2) {
                 if (!waveActive) {
-                    safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)))
+                    safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)), applyScale = false)
                     lastWave[ch] = turnCount
                     fixed = true
                 }
                 if (strength <= 0) {
-                    safety.apply(listOf(DeviceAction("hold_strength", ch, base, null, null)))
+                    safety.apply(listOf(DeviceAction("hold_strength", ch, base, null, null)), applyScale = false)
                     lastStrength[ch] = turnCount
                     fixed = true
                 }
             }
             if (turnCount - (lastStrength[ch] ?: 0) >= 2) {
                 val delta = if (strength < safety.capFor(ch)) 5 else -5
-                safety.apply(listOf(DeviceAction("add_strength", ch, delta, null, null)))
+                safety.apply(listOf(DeviceAction("add_strength", ch, delta, null, null)), applyScale = false)
                 lastStrength[ch] = turnCount
                 fixed = true
             }
             if (turnCount - (lastWave[ch] ?: 0) >= 2) {
-                safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)))
+                safety.apply(listOf(DeviceAction("pulse_hold", ch, null, DEFAULT_WAVE, null)), applyScale = false)
                 lastWave[ch] = turnCount
                 fixed = true
             }

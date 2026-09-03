@@ -3,9 +3,10 @@ package com.indhg.aiforcoyote.llm
 import android.content.Context
 
 /**
- * 系统提示词构建（多主题体系，对齐桌面版）：
- * 按「主题（角色） + 风格档」加载对应提示词文件，再注入设备映射 / 强度基准 /
- * 通道状态 / 波形列表等运行时信息；设备叙事（触手|装置）与称呼随主题切换。
+ * 系统提示词构建（对齐 PC v1.1.6）：
+ * 按角色入口加载对应提示词文件，再注入设备映射 / 强度基准 /
+ * 通道状态 / 波形列表等运行时信息；设备叙事（触手|装置|本体）与称呼随入口切换。
+ * 无风格档。怒气只跟画面/麦克风，不加档位基数。
  */
 object SystemPrompt {
 
@@ -15,36 +16,33 @@ object SystemPrompt {
     fun build(
         context: Context,
         roleName: String,
-        profileName: String,
         nick: String,
+        lang: String = Roles.LANG_ZH,
         channels: ChannelState = ChannelState(),
         cameraEnabled: Boolean = false,
         rageRounds: Int = 0,
         notes: List<String> = emptyList(),
     ): String {
         val role = Roles.find(roleName) ?: Roles.ALL.first()
-        val profile = role.profiles.firstOrNull { it.name == profileName } ?: role.profiles.first()
-        val base = profile.load(context)
+        val base = role.load(context, lang)
         val waveNames = loadWaveNames(context)
         val mapA = "A=贴片（小穴附近）"
         val mapB = "B=肛塞（后穴）"
         val workA = if (channels.working["A"] == true) "A 通道工作中" else "A 通道当前未工作（不要描写该位置的刺激）"
         val workB = if (channels.working["B"] == true) "B 通道工作中" else "B 通道当前未工作（不要描写该位置的刺激）"
-        val narrative = if (role.narrative == "触手") {
-            "靠近大腿根的那个配件位置，写成触手贴/缠/轻抚；靠近后穴的那个配件位置，写成触手探入/含住。台词里严禁出现「贴片」「肛塞」「通道」「A/B」「A位置」「B位置」等设备词汇。"
-        } else {
-            "靠近大腿根的那个配件位置，写成装置/电流作用在那里；靠近后穴的那个配件位置，写成装置探入/作用于那里。台词里严禁出现「贴片」「肛塞」「通道」「A/B」「A位置」「B位置」等设备词汇，装置的运转声、遥控调整可以写进描写。"
+        val narrative = when (role.narrative) {
+            "装置" ->
+                "靠近大腿根的那个配件位置，写成装置/电流作用在那里；靠近后穴的那个配件位置，写成装置探入/作用于那里。台词里严禁出现「贴片」「肛塞」「通道」「A/B」「A位置」「B位置」等设备词汇，装置的运转声、遥控调整可以写进描写。"
+            "本体" ->
+                "靠近大腿根的那个配件位置，写成本体贴着/缠/顶/磨；靠近后穴的那个配件位置，写成本体探入/顶弄/含住/灌。本体形态按你的角色设定。台词里严禁出现「贴片」「肛塞」「通道」「A/B」「A位置」「B位置」等设备词汇。"
+            else ->
+                "靠近大腿根的那个配件位置，写成触手贴/缠/轻抚；靠近后穴的那个配件位置，写成触手探入/含住。台词里严禁出现「贴片」「肛塞」「通道」「A/B」「A位置」「B位置」等设备词汇。"
         }
 
         return buildString {
             append(base.trim())
             append("\n\n")
-            append("【主题】你在扮演「").append(role.name).append("」，当前风格档：")
-            append(Roles.LEVEL_LABELS[profile.level] ?: profile.level)
-            if (profile.note.isNotBlank()) {
-                append("。").append(profile.note)
-            }
-            append("\n")
+            append("【主题】你在扮演「").append(role.name).append("」。\n")
             append("【设备映射】").append(mapA).append("；").append(mapB).append("。电刺激只出现在这两个配件位置。\n")
             append("【刺激描写规则】").append(narrative).append("\n")
             append("【通道工作状态】").append(workA).append("；").append(workB).append("。\n")
@@ -57,14 +55,14 @@ object SystemPrompt {
             if (cameraEnabled) {
                 append("【画面观察】每条玩家消息会附带一张最新实时画面。结合画面中玩家的反应调整策略：握紧、发抖、蜷缩=有效，可保持或降低；放松、走神、挑衅=适应了，可换节奏或小幅升高。把你观察到的玩家反应用（）写成身体描写，并及时跟上你的（）动作描写，只写画面里能确定的，看不清的部分保留悬念，不要凭空补写。\n")
             }
-            // 怒气值：基准怒气按档位固定（纯爱 0 / 调教 1 / 凌辱 2）+ 画面黑暗/无声逐轮升级
-            val rageBase = when (profile.level) { "轻" -> 0; "中" -> 1; "重" -> 2; else -> 0 }
-            val rage = rageRounds + rageBase
+            // 怒气只跟画面黑暗/无声逐轮升级（对齐 PC：不再按内容档加基数）
             when {
-                rage >= 5 -> append("【暴怒】已经连续 5 轮以上看不到画面反应、也听不到任何声音：你彻底暴怒了。用最大压迫逼他现身——辱骂、威胁、把强度拉高一个档位、命令他立刻出声，绝不退让。\n")
-                rage >= 3 -> append("【愤怒】连续 3 轮以上无画面反应且无声：玩家在躲你。进入愤怒——语气转狠，强度逐步加码，威胁与催促一起上，逼他回应。\n")
-                rage >= 1 -> append("【不耐烦】画面黑暗或麦克风持续无声：你开始不耐烦，用催促、质疑逼玩家回应；他若继续沉默，接下来几轮内你会升级为愤怒、乃至暴怒。\n")
+                rageRounds >= 5 -> append("【暴怒】已经连续 5 轮以上看不到画面反应、也听不到任何声音：你彻底暴怒了。用最大压迫逼他现身——辱骂、威胁、把强度拉高一个档位、命令他立刻出声，绝不退让。\n")
+                rageRounds >= 3 -> append("【愤怒】连续 3 轮以上无画面反应且无声：玩家在躲你。进入愤怒——语气转狠，强度逐步加码，威胁与催促一起上，逼他回应。\n")
+                rageRounds >= 1 -> append("【不耐烦】画面黑暗或麦克风持续无声：你开始不耐烦，用催促、质疑逼玩家回应；他若继续沉默，接下来几轮内你会升级为愤怒、乃至暴怒。\n")
             }
+            // 连续自动回合时防复读：每轮必须换说法，禁止重复上一轮的台词与措辞（同步 PC v1.1.5 7eb4f28 修复）
+            append("【避免重复】连续多轮自动发言时，每轮台词都要有新内容、新措辞：催促/挑逗/威胁轮着换花样（威吓→诱惑→冷落→换话题→描述现场），严禁连续两轮说同一句或近义句（如一直喊「别走神」）。\n")
             for (note in notes) {
                 append("【玩家反馈】").append(note).append("\n")
             }

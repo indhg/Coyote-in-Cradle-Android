@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.indhg.aiforcoyote.MainViewModel
 import com.indhg.aiforcoyote.UiMsg
-import com.indhg.aiforcoyote.llm.Roles
 import com.indhg.aiforcoyote.ui.theme.Bad
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
@@ -114,10 +113,8 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 Text(
                     buildString {
                         append(settings.role)
-                        append(" · ")
-                        val role = Roles.find(settings.role)
-                        val prof = role?.profiles?.firstOrNull { it.name == settings.profile }
-                        append(if (prof != null) Roles.LEVEL_LABELS[prof.level] ?: settings.profile else settings.profile)
+                        append(" · 强度")
+                        append(settings.intensityLevel)
                     },
                     fontSize = 12.sp,
                     color = Muted,

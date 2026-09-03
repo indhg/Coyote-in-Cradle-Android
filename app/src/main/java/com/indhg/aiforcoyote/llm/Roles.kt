@@ -5,71 +5,120 @@ import java.io.File
 import java.io.IOException
 
 /**
- * 主题体系（对齐桌面版 roles 结构）：
- * 每个主题（角色）自带若干风格档（轻/中/重 → 显示名 纯爱/调教/凌辱）。
- * 提示词来源两种：assets（本体，永远可用）/ DLC 文件（filesDir/dlc/，导入后可用）。
+ * 角色入口（对齐 PC v1.1.6）：
+ * - 体验版：内置 assets，永远可用。
+ * - 5 个正式角色：运行时检测 filesDir/content/roles/<角色>-角色提示词.md（或 -EN.md）。
+ *   存在=可用，不存在=未导入，禁止选中生成。
+ * 不再有「纯爱/调教/凌辱」多 Profile。电击强度三档与内容无关。
  */
 object Roles {
 
-    const val DLC_DIR = "dlc"
+    /** 相对 filesDir。与 PC DLC zip 内 `content/roles/` 同构，解压后按文件名落入此目录。 */
+    const val CONTENT_ROLES_DIR = "content/roles"
 
-    data class Profile(
-        val name: String,          // 纯爱 / 调教
-        val level: String,         // 轻 / 中 / 重
-        val asset: String? = null, // assets 内路径（本体）
-        val dlcRel: String? = null, // filesDir 内相对路径（DLC）
-        val note: String = "",     // 风格说明（注入提示词）
+    const val LANG_ZH = "zh"
+    const val LANG_EN = "en"
+
+    val INTENSITY_LEVELS = listOf("轻", "中", "重")
+
+    data class Entry(
+        val key: String,
+        val name: String,
+        val title: String,
+        val narrative: String, // 触手 / 装置 / 本体
+        val trial: Boolean = false,
+        val recommended: Boolean = false,
+        val asset: String? = null,
+        val fileName: String? = null, // 正式稿 CN 文件名，如 触手-角色提示词.md
     ) {
-        fun available(context: Context): Boolean =
-            asset != null || (dlcRel != null && File(context.filesDir, dlcRel).exists())
+        fun promptFileName(lang: String): String? {
+            val base = fileName ?: return null
+            return if (lang == LANG_EN) base.removeSuffix(".md") + "-EN.md" else base
+        }
 
-        fun load(context: Context): String = when {
-            asset != null ->
-                context.assets.open(asset).bufferedReader().use { it.readText() }
-            dlcRel != null -> {
-                val f = File(context.filesDir, dlcRel)
-                if (f.exists()) f.readText()
-                else throw IOException("该风格未安装：请在设置页导入对应 DLC 包")
+        fun available(context: Context, lang: String = LANG_ZH): Boolean {
+            if (asset != null) return true
+            val fn = promptFileName(lang) ?: return false
+            return File(context.filesDir, "$CONTENT_ROLES_DIR/$fn").isFile
+        }
+
+        fun load(context: Context, lang: String = LANG_ZH): String {
+            if (asset != null) {
+                return context.assets.open(asset).bufferedReader().use { it.readText() }
             }
-            else -> throw IOException("该风格没有提示词来源")
+            val fn = promptFileName(lang)
+                ?: throw IOException("该角色没有提示词来源")
+            val f = File(context.filesDir, "$CONTENT_ROLES_DIR/$fn")
+            if (!f.isFile) {
+                throw IOException("「$name」未导入：请在设置页导入 DLC 包")
+            }
+            return f.readText()
         }
     }
 
-    data class Role(
-        val name: String,          // 触手 / 品评会
-        val title: String,         // 玩家对它的称呼
-        val narrative: String,     // 设备叙事：触手=本体即设备 / 装置=遥控支配
-        val profiles: List<Profile>,
-    ) {
-        fun usable(context: Context): Boolean = profiles.any { it.available(context) }
-    }
-
-    val ALL: List<Role> = listOf(
-        Role(
-            "触手", "主人", "触手",
-            listOf(
-                Profile("纯爱", "轻", asset = "prompts/触手-角色提示词-纯爱.md"),
-                Profile("调教", "中", dlcRel = "$DLC_DIR/触手-角色提示词-调教.md"),
-            ),
+    val ALL: List<Entry> = listOf(
+        Entry(
+            key = "trial",
+            name = "体验版",
+            title = "主人",
+            narrative = "触手",
+            trial = true,
+            asset = "prompts/触手-角色提示词-纯爱.md",
         ),
-        Role(
-            "品评会", "主人", "装置",
-            listOf(
-                Profile(
-                    "调教", "中", dlcRel = "$DLC_DIR/品评会-角色提示词-调教.md",
-                    note = "调教版（品评会）：公开审评、装置支配、围观施压；以羞辱与驯化为核心，从哭腔抗拒走向条件反射式服从。",
-                ),
-            ),
+        Entry(
+            key = "cushou",
+            name = "触手",
+            title = "主人",
+            narrative = "触手",
+            recommended = true,
+            fileName = "触手-角色提示词.md",
+        ),
+        Entry(
+            key = "appraisal",
+            name = "品评会",
+            title = "主人",
+            narrative = "装置",
+            recommended = true,
+            fileName = "品评会-角色提示词.md",
+        ),
+        Entry(
+            key = "goblin",
+            name = "哥布林",
+            title = "主人",
+            narrative = "本体",
+            fileName = "哥布林-角色提示词.md",
+        ),
+        Entry(
+            key = "slime",
+            name = "史莱姆",
+            title = "主人",
+            narrative = "本体",
+            fileName = "史莱姆-角色提示词.md",
+        ),
+        Entry(
+            key = "zhuhou",
+            name = "蛛后",
+            title = "主人",
+            narrative = "本体",
+            fileName = "蛛后-角色提示词.md",
         ),
     )
 
-    fun find(name: String): Role? = ALL.firstOrNull { it.name == name }
+    /** DLC zip / 单 md 允许落入 content/roles 的文件名（CN + EN）。旧 -调教/-凌辱 不在此列。 */
+    val KNOWN_DLC_FILES: Set<String> = ALL.mapNotNull { it.fileName }.flatMap { cn ->
+        listOf(cn, cn.removeSuffix(".md") + "-EN.md")
+    }.toSet()
 
-    /** 档位显示名（用户定名）：轻→纯爱、中→调教、重→凌辱 */
-    val LEVEL_LABELS = mapOf("轻" to "纯爱", "中" to "调教", "重" to "凌辱")
+    fun find(name: String): Entry? = ALL.firstOrNull { it.name == name }
 
-    val LEVELS = listOf("轻", "中", "重")
+    fun contentRolesDir(context: Context): File = File(context.filesDir, CONTENT_ROLES_DIR)
 
-    /** 旧版兼容：调教版提示词相对路径（DLC1 导入检测用）。 */
-    const val DLC1_PROMPT_REL = "$DLC_DIR/触手-角色提示词-调教.md"
+    /**
+     * 旧档位 → 新入口。触手+纯爱 = 体验版；其余已知角色名保留；未知回体验版。
+     */
+    fun migrateRole(role: String, profile: String): String {
+        if (role == "触手" && profile == "纯爱") return "体验版"
+        if (find(role) != null) return role
+        return "体验版"
+    }
 }

@@ -83,7 +83,10 @@ private fun levelColors(level: String): Pair<Color, Color> = when (level) {
 
 private fun roleAvatarRes(role: String): Int = when (role) {
     "品评会" -> R.drawable.theme_pingpinghui
-    else -> R.drawable.theme_cushou
+    "哥布林" -> R.drawable.theme_gebulin
+    "史莱姆" -> R.drawable.theme_shilaimu
+    "蛛后" -> R.drawable.theme_zhuhou
+    else -> R.drawable.theme_cushou // 体验版 / 触手
 }
 
 @Composable
@@ -246,11 +249,14 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         Text("配对郊狼", fontSize = 13.sp, color = Muted)
         DeviceSection(vm)
 
-        Text("主题设置", fontSize = 13.sp, color = Muted)
+        Text("角色入口", fontSize = 13.sp, color = Muted)
         ThemeCard(
             vm = vm,
             role = settings.role,
-            profile = settings.profile,
+            intensityLevel = settings.intensityLevel,
+            contentLang = settings.contentLang,
+            trialBadgeSeen = settings.trialBadgeSeen,
+            dlcRefresh = dlcRefresh,
             onImport = { pickLauncher.launch(Unit) },
         )
 
@@ -289,19 +295,24 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     }
 }
 
-/** 主题卡：只显示当前主题一行；点开浮层——上段主题列表、下段三档（支持的才亮）、底部导入。 */
+/** 入口卡：当前角色一行；点开浮层——入口列表（未导入灰禁+角标）、电击强度三档、语言、导入。 */
 @Composable
 private fun ThemeCard(
     vm: MainViewModel,
     role: String,
-    profile: String,
+    intensityLevel: String,
+    contentLang: String,
+    trialBadgeSeen: Boolean,
+    dlcRefresh: Int,
     onImport: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var roleListOpen by remember { mutableStateOf(false) }
     val current = Roles.find(role) ?: Roles.ALL.first()
-    val curProfile = current.profiles.firstOrNull { it.name == profile } ?: current.profiles.first()
-    val (lvColor, lvBg) = levelColors(curProfile.level)
+    val (lvColor, lvBg) = levelColors(intensityLevel)
+    // 读取 dlcRefresh：导入成功后父级递增，本卡重组并重扫 content/roles
+    @Suppress("UNUSED_VARIABLE")
+    val importGen = dlcRefresh
 
     Box {
         Row(
@@ -325,7 +336,7 @@ private fun ThemeCard(
                     Text(current.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextMain)
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "${Roles.LEVEL_LABELS[curProfile.level] ?: curProfile.level}",
+                        "强度 $intensityLevel",
                         modifier = Modifier
                             .background(lvBg, RoundedCornerShape(5.dp))
                             .padding(horizontal = 6.dp, vertical = 1.dp),
@@ -333,7 +344,7 @@ private fun ThemeCard(
                         color = lvColor,
                     )
                 }
-                Text("点击切换主题与风格", fontSize = 11.sp, color = Faint)
+                Text("点击切换角色与电击强度", fontSize = 11.sp, color = Faint)
             }
         }
         DropdownMenu(
@@ -343,7 +354,7 @@ private fun ThemeCard(
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             Column(Modifier.width(280.dp).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("主题", fontSize = 11.sp, color = Muted)
+                Text("角色", fontSize = 11.sp, color = Muted)
                 if (!roleListOpen) {
                     Row(
                         modifier = Modifier
@@ -359,7 +370,7 @@ private fun ThemeCard(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(current.name, fontSize = 13.sp, color = TextMain, modifier = Modifier.weight(1f))
-                        Text("（点击换主题）", fontSize = 10.sp, color = Faint)
+                        Text("（点击换角色）", fontSize = 10.sp, color = Faint)
                     }
                 } else {
                     Roles.ALL.forEach { r ->
@@ -368,9 +379,7 @@ private fun ThemeCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable(enabled = usable) {
-                                    val firstAvail = r.profiles.firstOrNull { vm.profileAvailable(r.name, it.name) }
-                                        ?: r.profiles.first()
-                                    vm.setRoleProfile(r.name, firstAvail.name)
+                                    vm.setRole(r.name)
                                     roleListOpen = false
                                 }
                                 .background(if (r.name == role) Color(0x22F7D97A) else Color.Transparent, RoundedCornerShape(6.dp))
@@ -385,38 +394,60 @@ private fun ThemeCard(
                                     .background(if (usable) Color.Transparent else Color(0x33000000), RoundedCornerShape(4.dp)),
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                r.name + if (!usable) "（未装）" else "",
-                                fontSize = 13.sp,
-                                color = if (usable) TextMain else Faint,
-                                modifier = Modifier.weight(1f),
-                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    r.name,
+                                    fontSize = 13.sp,
+                                    color = if (usable) TextMain else Faint,
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (r.trial && !trialBadgeSeen) {
+                                        Text("新手推荐", fontSize = 10.sp, color = Gold)
+                                    }
+                                    if (r.recommended && usable) {
+                                        Text("推荐", fontSize = 10.sp, color = Gold)
+                                    }
+                                    if (!usable) {
+                                        Text("未导入", fontSize = 10.sp, color = Faint)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
                 Spacer(Modifier.height(2.dp))
-                Text("风格（支持档才亮）", fontSize = 11.sp, color = Muted)
+                Text("电击强度（与对话内容无关）", fontSize = 11.sp, color = Muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Roles.LEVELS.forEach { lv ->
-                        val p = current.profiles.firstOrNull { it.level == lv }
-                        val lit = p != null && vm.profileAvailable(current.name, p.name)
-                        val selected = p?.name == profile
+                    Roles.INTENSITY_LEVELS.forEach { lv ->
+                        val selected = lv == intensityLevel
                         val (c, bg) = levelColors(lv)
                         Button(
-                            onClick = { p?.let { vm.setRoleProfile(current.name, it.name) } },
-                            enabled = lit,
+                            onClick = { vm.setIntensityLevel(lv) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) Gold else bg,
-                                contentColor = if (selected) Ink else if (lit) c else Faint,
-                                disabledContainerColor = Color.Transparent,
-                                disabledContentColor = Faint,
+                                contentColor = if (selected) Ink else c,
                             ),
                         ) {
+                            Text(lv, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(2.dp))
+                Text("内容语言", fontSize = 11.sp, color = Muted)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(Roles.LANG_ZH to "中文", Roles.LANG_EN to "English").forEach { (code, label) ->
+                        val selected = contentLang == code
+                        OutlinedButton(
+                            onClick = { vm.setContentLang(code) },
+                            modifier = Modifier.weight(1f),
+                        ) {
                             Text(
-                                "${Roles.LEVEL_LABELS[lv] ?: lv}${if (!lit) "" else ""}",
+                                label,
                                 fontSize = 12.sp,
+                                color = if (selected) Gold else Muted,
                             )
                         }
                     }
@@ -430,6 +461,12 @@ private fun ThemeCard(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("导入 DLC（打开文件管理）", fontSize = 12.sp, color = Muted) }
+                Text(
+                    "解压或直接选 zip。现行包文件名：content/roles/<角色>-角色提示词.md（中文）或 …-EN.md（英文）。旧 -调教 包不再支持。",
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    color = Faint,
+                )
             }
         }
     }

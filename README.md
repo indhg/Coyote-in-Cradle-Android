@@ -18,7 +18,7 @@ AI 扮演主题角色（**触手**／**品评会**〔DLC〕，档位：纯爱／
 
 👉 <https://github.com/indhg/Coyote-in-Cradle-Android/releases/latest>
 
-**本项目完全免费开源（GPL-3.0），任何收费渠道均为盗版。** 作者推特主页欢迎来支持喵～<https://x.com/cinnanirch>
+**本项目为作者原创，采用「可分享 · 禁商用」许可（见 [LICENSE](LICENSE)）：允许免费转发分享与个人使用，**禁止任何盈利目的的分发、转售与收费**；商用授权请联系作者。** 作者推特主页欢迎来支持喵～<https://x.com/cinnanirch>
 
 ## 📦 相关仓库
 
@@ -72,7 +72,7 @@ Download the latest APK here:
 
 👉 <https://github.com/indhg/Coyote-in-Cradle-Android/releases/latest>
 
-**This project is completely free and open source（GPL-3.0）. Any paid distribution channel is piracy.** You are welcome to support the author on Twitter: <https://x.com/cinnanirch>
+**This project is the author's original work under a “Free-Share, Non-Commercial” license (see [LICENSE](LICENSE)): free sharing and personal use are allowed — any profit-driven distribution, resale or paid hosting is prohibited. For commercial licensing, contact the author.** Welcome to support the author on Twitter: <https://x.com/cinnanirch>
 
 ## 📦 Related repositories
 

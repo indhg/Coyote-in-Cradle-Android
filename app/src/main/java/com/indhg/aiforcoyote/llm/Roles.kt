@@ -28,7 +28,6 @@ object Roles {
         val narrative: String, // 触手 / 装置 / 本体
         val trial: Boolean = false,
         val recommended: Boolean = false,
-        val asset: String? = null,
         val fileName: String? = null, // 正式稿 CN 文件名，如 触手-角色提示词.md
     ) {
         fun promptFileName(lang: String): String? {
@@ -37,20 +36,25 @@ object Roles {
         }
 
         fun available(context: Context, lang: String = LANG_ZH): Boolean {
-            if (asset != null) return true
+            if (trial) return true
             val fn = promptFileName(lang) ?: return false
             return File(context.filesDir, "$CONTENT_ROLES_DIR/$fn").isFile
         }
 
-        fun load(context: Context, lang: String = LANG_ZH): String {
-            if (asset != null) {
+        /**
+         * @param scriptLang 角色稿语言 zh/en
+         * @param uiLang 界面语言 zh/en；体验版仅在两者都是 en 时读英文纯爱稿
+         */
+        fun load(context: Context, scriptLang: String = LANG_ZH, uiLang: String = LANG_ZH): String {
+            if (trial) {
+                val asset = trialAsset(scriptLang, uiLang)
                 return context.assets.open(asset).bufferedReader().use { it.readText() }
             }
-            val fn = promptFileName(lang)
-                ?: throw IOException("该角色没有提示词来源")
+            val fn = promptFileName(scriptLang)
+                ?: throw IOException(context.getString(com.indhg.aiforcoyote.R.string.err_no_prompt))
             val f = File(context.filesDir, "$CONTENT_ROLES_DIR/$fn")
             if (!f.isFile) {
-                throw IOException("「$name」未导入：请在设置页导入 DLC 包")
+                throw IOException(context.getString(com.indhg.aiforcoyote.R.string.err_role_load, name))
             }
             return f.readText()
         }
@@ -63,7 +67,6 @@ object Roles {
             title = "主人",
             narrative = "触手",
             trial = true,
-            asset = "prompts/触手-角色提示词-纯爱.md",
         ),
         Entry(
             key = "cushou",
@@ -108,6 +111,13 @@ object Roles {
     val KNOWN_DLC_FILES: Set<String> = ALL.mapNotNull { it.fileName }.flatMap { cn ->
         listOf(cn, cn.removeSuffix(".md") + "-EN.md")
     }.toSet()
+
+    const val TRIAL_ASSET_ZH = "prompts/触手-角色提示词-纯爱.md"
+    const val TRIAL_ASSET_EN = "prompts/触手-角色提示词-纯爱-EN.md"
+
+    /** 体验版 EN 稿仅在界面语言与角色稿语言都是 en 时启用。 */
+    fun trialAsset(scriptLang: String, uiLang: String): String =
+        if (uiLang == LANG_EN && scriptLang == LANG_EN) TRIAL_ASSET_EN else TRIAL_ASSET_ZH
 
     fun find(name: String): Entry? = ALL.firstOrNull { it.name == name }
 

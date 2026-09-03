@@ -18,13 +18,14 @@ object SystemPrompt {
         roleName: String,
         nick: String,
         lang: String = Roles.LANG_ZH,
+        uiLang: String = Roles.LANG_ZH,
         channels: ChannelState = ChannelState(),
         cameraEnabled: Boolean = false,
         rageRounds: Int = 0,
         notes: List<String> = emptyList(),
     ): String {
         val role = Roles.find(roleName) ?: Roles.ALL.first()
-        val base = role.load(context, lang)
+        val base = role.load(context, scriptLang = lang, uiLang = uiLang)
         val waveNames = loadWaveNames(context)
         val mapA = "A=贴片（小穴附近）"
         val mapB = "B=肛塞（后穴）"

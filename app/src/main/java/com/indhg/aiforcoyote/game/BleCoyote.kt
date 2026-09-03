@@ -51,6 +51,8 @@ class BleCoyote(
     val onDisconnect: () -> Unit = {},
 ) : DeviceOps {
 
+    private val appCtx = context.applicationContext
+
     companion object {
         private const val TAG = "BleCoyote"
         private const val DEVICE_NAME = "47L121000"
@@ -128,7 +130,7 @@ class BleCoyote(
         wantConnection = true
         if (_state.value.status == "scanning" || _state.value.status == "connecting") return
         val a = adapter ?: run {
-            _state.value = _state.value.copy(error = "本机无蓝牙")
+            _state.value = _state.value.copy(error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_no_bt))
             return
         }
         // ① 系统已配对设备里找郊狼（官方 App 配对后广播不再带名字，但配对列表里有名字）
@@ -164,7 +166,7 @@ class BleCoyote(
         try {
             connectGatt(a.getRemoteDevice(address))
         } catch (_: Exception) {
-            _state.value = DeviceState("disconnected", error = "连接失败：地址无效")
+            _state.value = DeviceState("disconnected", error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_bad_addr))
         }
     }
 
@@ -199,7 +201,7 @@ class BleCoyote(
             }
 
             override fun onScanFailed(errorCode: Int) {
-                _state.value = DeviceState("disconnected", error = "扫描失败 code=$errorCode")
+                _state.value = DeviceState("disconnected", error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_scan_fail, errorCode))
             }
         }
         a.bluetoothLeScanner?.startScan(null, settings, scanCb)
@@ -207,8 +209,9 @@ class BleCoyote(
             delay(SCAN_TIMEOUT_MS)
             if (_state.value.status == "scanning") {
                 stopScan()
-                val extra = if (seen.isEmpty()) "（周围没扫到任何 BLE 设备）" else "；扫到：${seen.joinToString("；")}"
-                _state.value = DeviceState("disconnected", error = "未找到郊狼（BLE 名 $DEVICE_NAME）$extra")
+                val extra = if (seen.isEmpty()) appCtx.getString(com.indhg.aiforcoyote.R.string.err_scan_empty)
+                else appCtx.getString(com.indhg.aiforcoyote.R.string.err_scan_seen, seen.joinToString("；"))
+                _state.value = DeviceState("disconnected", error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_coyote_not_found, DEVICE_NAME, extra))
             }
         }
     }
@@ -272,12 +275,12 @@ class BleCoyote(
             writeChar = service?.getCharacteristic(WRITE_CHAR)
             val notify = service?.getCharacteristic(NOTIFY_CHAR)
             if (writeChar == null || notify == null) {
-                _state.value = DeviceState("disconnected", error = "特征值缺失，可能不是郊狼 3.0")
+                _state.value = DeviceState("disconnected", error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_missing_char))
                 disconnect()
                 return
             }
             if (!enableNotify(g, notify)) {
-                _state.value = DeviceState("disconnected", error = "通知订阅失败")
+                _state.value = DeviceState("disconnected", error = appCtx.getString(com.indhg.aiforcoyote.R.string.err_notify_fail))
                 disconnect()
                 return
             }

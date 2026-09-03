@@ -9,3 +9,5 @@ local.properties
 .cxx
 *.apk
 *.aab
+
+.kotlin/

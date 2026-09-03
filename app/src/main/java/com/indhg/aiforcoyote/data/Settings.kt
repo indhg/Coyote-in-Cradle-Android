@@ -20,6 +20,8 @@ data class Settings(
     val role: String = "体验版",
     val intensityLevel: String = "中",
     val contentLang: String = Roles.LANG_ZH,
+    val uiLang: String = "system",
+    val scriptFollowUi: Boolean = true,
     val autopilot: Boolean = true,
     val jsonMode: Boolean = true,
     val checkUpdate: Boolean = true,
@@ -38,7 +40,17 @@ class SettingsRepository(private val context: Context) {
             nick = p[KEY_NICK] ?: "小柳",
             role = Roles.migrateRole(rawRole, rawProfile),
             intensityLevel = p[KEY_INTENSITY]?.takeIf { it in Roles.INTENSITY_LEVELS } ?: "中",
-            contentLang = p[KEY_CONTENT_LANG]?.takeIf { it == Roles.LANG_EN || it == Roles.LANG_ZH } ?: Roles.LANG_ZH,
+            uiLang = p[KEY_UI_LANG]?.takeIf { it == "zh" || it == "en" || it == "system" } ?: "system",
+            scriptFollowUi = p[KEY_SCRIPT_FOLLOW] ?: true,
+            contentLang = run {
+                val stored = p[KEY_CONTENT_LANG]?.takeIf { it == Roles.LANG_EN || it == Roles.LANG_ZH }
+                val follow = p[KEY_SCRIPT_FOLLOW] ?: true
+                if (follow || stored == null) {
+                    val ui = p[KEY_UI_LANG]?.takeIf { it == "zh" || it == "en" || it == "system" } ?: "system"
+                    if (ui == "en") Roles.LANG_EN else if (ui == "zh") Roles.LANG_ZH else
+                        if (java.util.Locale.getDefault().language.lowercase().startsWith("zh")) Roles.LANG_ZH else Roles.LANG_EN
+                } else stored
+            },
             autopilot = p[KEY_AUTOPILOT] ?: true,
             jsonMode = p[KEY_JSON_MODE] ?: true,
             checkUpdate = p[KEY_CHECK_UPDATE] ?: true,
@@ -57,6 +69,8 @@ class SettingsRepository(private val context: Context) {
             p[KEY_PROFILE] = "正式"
             p[KEY_INTENSITY] = next.intensityLevel
             p[KEY_CONTENT_LANG] = next.contentLang
+            p[KEY_UI_LANG] = next.uiLang
+            p[KEY_SCRIPT_FOLLOW] = next.scriptFollowUi
             p[KEY_AUTOPILOT] = next.autopilot
             p[KEY_JSON_MODE] = next.jsonMode
             p[KEY_CHECK_UPDATE] = next.checkUpdate
@@ -73,6 +87,8 @@ class SettingsRepository(private val context: Context) {
         val KEY_PROFILE = stringPreferencesKey("profile") // 旧档位，只用于迁移，写入固定「正式」
         val KEY_INTENSITY = stringPreferencesKey("intensity_level")
         val KEY_CONTENT_LANG = stringPreferencesKey("content_lang")
+        val KEY_UI_LANG = stringPreferencesKey("ui_lang")
+        val KEY_SCRIPT_FOLLOW = booleanPreferencesKey("script_follow_ui")
         val KEY_AUTOPILOT = booleanPreferencesKey("autopilot")
         val KEY_JSON_MODE = booleanPreferencesKey("json_mode")
         val KEY_CHECK_UPDATE = booleanPreferencesKey("check_update")

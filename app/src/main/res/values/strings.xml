@@ -1,4 +1,159 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Coyote in Cradle</string>
+
+    <string name="settings">设置</string>
+    <string name="back">返回</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="clear">清空</string>
+    <string name="send">发送</string>
+    <string name="disconnect">断开</string>
+
+    <string name="lang_system">跟随系统</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="ui_language">界面语言</string>
+    <string name="ui_language_note">软件菜单、按钮、提示的语言。不是语音朗读（本软件没有朗读功能）。</string>
+    <string name="script_language">角色稿语言</string>
+    <string name="script_language_note">仅切换 AI 角色内容稿（中文稿 / 英文稿）的语言，不是软件界面语言，也不是语音朗读（本软件无朗读功能）。</string>
+    <string name="script_follow_hint">角色稿当前跟随界面语言。点下面的稿语言可单独指定。</string>
+    <string name="trial_script_mismatch">体验版内置稿随界面语言；角色稿语言只影响已导入的正式角色。</string>
+
+    <string name="role_trial">体验版</string>
+    <string name="role_tentacle">触手</string>
+    <string name="role_appraisal">品评会</string>
+    <string name="role_goblin">哥布林</string>
+    <string name="role_slime">史莱姆</string>
+    <string name="role_arachne">蛛后</string>
+    <string name="badge_start_here">新手推荐</string>
+    <string name="badge_pick">推荐</string>
+    <string name="badge_not_installed">未导入</string>
+
+    <string name="intensity_tender">轻</string>
+    <string name="intensity_dominant">中</string>
+    <string name="intensity_rough">重</string>
+    <string name="intensity_with_level">强度 %1$s</string>
+    <string name="chat_subtitle">%1$s · 强度%2$s</string>
+
+    <string name="ai_model">AI 模型配置</string>
+    <string name="api_key_saved">已保存（留空则保持不变）</string>
+    <string name="api_key_paste">粘贴你的 API Key</string>
+    <string name="model_name">模型名</string>
+    <string name="json_mode">JSON 模式</string>
+    <string name="json_mode_hint">部分中转站不兼容，可关闭</string>
+    <string name="test_connection">测试连接</string>
+    <string name="saved_now">已保存（立即生效）</string>
+    <string name="conn_ok">连接成功，模型可用</string>
+    <string name="conn_fail">连接失败</string>
+    <string name="err_api_key">API Key 无效或未填：官方与中转站的密钥不通用，请确认 Base URL 与密钥配套</string>
+    <string name="err_http_400">请求参数不被支持（中转站常见）：请核对模型名，或关闭 JSON 模式</string>
+    <string name="err_http">HTTP %1$d</string>
+
+    <string name="update">更新</string>
+    <string name="update_available">发现新版本 %1$s，点击下载</string>
+    <string name="update_latest">已是最新（%1$s）</string>
+    <string name="update_none">尚未检查到更新</string>
+    <string name="auto_check">自动检查</string>
+
+    <string name="pair_coyote">配对郊狼</string>
+    <string name="role_entry">角色入口</string>
+    <string name="nick_section">称谓（AI 怎么叫你）</string>
+    <string name="nick_label">称谓</string>
+    <string name="save_nick">保存昵称</string>
+    <string name="nick_saved">昵称已保存</string>
+    <string name="observe_section">观察开关</string>
+    <string name="cap_section">强度上限（默认 100，郊狼满值 200）</string>
+    <string name="disclaimer">仅供成年人、双方自愿的虚构角色扮演使用。心脏病、心脏起搏器等健康风险人群请勿使用。</string>
+    <string name="version_line">Coyote in Cradle v%1$s（build %2$d）</string>
+
+    <string name="tap_switch_role_intensity">点击切换角色与电击强度</string>
+    <string name="roles">角色</string>
+    <string name="tap_change_role">（点击换角色）</string>
+    <string name="shock_intensity">电击强度（与对话内容无关）</string>
+    <string name="import_dlc">导入 DLC（打开文件管理）</string>
+    <string name="import_dlc_hint">解压或直接选 zip。现行包文件名：content/roles/&lt;角色&gt;-角色提示词.md（中文）或 …-EN.md（英文）。旧 -调教 包不再支持。</string>
+
+    <string name="camera">摄像头</string>
+    <string name="mic">麦克风</string>
+    <string name="channel_n">%1$s 通道</string>
+
+    <string name="coyote_device">郊狼设备</string>
+    <string name="dev_connected">已连接</string>
+    <string name="dev_connected_bat">已连接 · 电量 %1$d%%</string>
+    <string name="dev_scanning">扫描中…（郊狼需开机且靠近手机）</string>
+    <string name="dev_connecting">连接中…</string>
+    <string name="dev_disconnected">未连接</string>
+    <string name="dev_connect_steps">连接步骤：① 郊狼开机并靠近手机 ② 点「连接郊狼」 ③ 扫描列表里点信号最强的设备\n请不要在官方 App 已连接郊狼的情况下使用。</string>
+    <string name="dev_pick_list">点选设备直连（信号强的在前）：</string>
+    <string name="dev_unnamed">无名设备</string>
+    <string name="connect_coyote">连接郊狼</string>
+    <string name="ble_direct_hint">蓝牙直连脉冲主机，无需郊狼 App 与中继。</string>
+
+    <string name="err_no_bt">本机无蓝牙</string>
+    <string name="err_bad_addr">连接失败：地址无效</string>
+    <string name="err_scan_fail">扫描失败 code=%1$d</string>
+    <string name="err_coyote_not_found">未找到郊狼（BLE 名 %1$s）%2$s</string>
+    <string name="err_scan_empty">（周围没扫到任何 BLE 设备）</string>
+    <string name="err_scan_seen">；扫到：%1$s</string>
+    <string name="err_missing_char">特征值缺失，可能不是郊狼 3.0</string>
+    <string name="err_notify_fail">通知订阅失败</string>
+    <string name="err_cam_perm">相机权限未授予（仅聊天模式）</string>
+    <string name="err_cam_start">摄像头启动失败: %1$s</string>
+    <string name="err_mic_perm">麦克风权限未授予（仅聊天模式）</string>
+    <string name="err_mic_unavailable">麦克风不可用</string>
+    <string name="err_mic_open">麦克风打开失败: %1$s</string>
+    <string name="err_mic_init">麦克风初始化失败</string>
+    <string name="err_record">录音异常: %1$s</string>
+
+    <string name="chat_coyote_on">郊狼已连接</string>
+    <string name="chat_coyote_on_bat">郊狼已连接 %1$d%%</string>
+    <string name="chat_coyote_scan">扫描郊狼中…</string>
+    <string name="chat_coyote_connecting">连接郊狼中…</string>
+    <string name="chat_coyote_off">郊狼未连接</string>
+    <string name="observing_on">观察中</string>
+    <string name="observing_off">观察关</string>
+    <string name="autopilot">自动运行</string>
+    <string name="mic_off">麦克风关</string>
+    <string name="observe_need_perm">观察关（授权相机/麦克风后开启）</string>
+    <string name="rage_n">怒气 %1$d</string>
+    <string name="observing_wait">触手正在观察……</string>
+    <string name="input_hint">说点什么，或什么都不说……</string>
+    <string name="clear_title">清空对话历史？</string>
+    <string name="clear_body">将清空聊天记录与 AI 的记忆上下文，设备强度不受影响。</string>
+
+    <string name="toast_need_api">请先在设置页填写 API Key</string>
+    <string name="toast_role_missing">「%1$s」未导入：先导入对应 DLC 包</string>
+    <string name="toast_role_fallback">「%1$s」未导入，已切回体验版</string>
+    <string name="toast_cleared">对话历史已清空</string>
+    <string name="toast_model_blank">模型走神了……再发一次？</string>
+    <string name="toast_unknown_file">未知文件</string>
+    <string name="toast_exception">异常（%1$s）</string>
+    <string name="toast_import_fail">导入完成，失败 %1$d 项：%2$s</string>
+    <string name="toast_import_new">已导入：「%1$s」可用</string>
+    <string name="toast_import_ok">导入完成。若仍显示未导入，请确认是现行 DLC（无 -调教 后缀）且语言档匹配。</string>
+    <string name="err_cant_read">无法读取文件</string>
+    <string name="err_cant_read_name">无法读取文件名</string>
+    <string name="err_legacy_pack">这是旧档位包（-调教/-凌辱），现行 DLC 文件名无后缀。请安装 DLC-zh v0.4.1 或 DLC-en v0.4.0</string>
+    <string name="err_no_role_md">包里没有可识别的角色稿（需要 content/roles/&lt;角色&gt;-角色提示词.md）</string>
+    <string name="err_unknown_md">未识别的提示词文件。现行文件名如 触手-角色提示词.md / 触手-角色提示词-EN.md（无 -调教 后缀）</string>
+    <string name="err_no_prompt">该角色没有提示词来源</string>
+    <string name="err_role_load">「%1$s」未导入：请在设置页导入 DLC 包</string>
+
+    <string name="safety_stop_all">全部停止</string>
+    <string name="safety_clear_ch">%1$s 清零</string>
+    <string name="safety_clear_all">全部清零</string>
+    <string name="safety_need_ch_val">缺少通道或数值</string>
+    <string name="safety_step">%1$s 单次变化 %2$d 超过 %3$d</string>
+    <string name="safety_hold">%1$s 强度 %2$d</string>
+    <string name="safety_need_ch">缺少通道</string>
+    <string name="safety_need_delta">缺少 delta</string>
+    <string name="safety_need_wave">缺少通道或波形名</string>
+    <string name="safety_wave">%1$s 波形 %2$s</string>
+    <string name="safety_unknown_op">未知 op %1$s</string>
+
+    <string name="moan_high">麦克风检测到玩家发出较大的呻吟/惨叫（音量高）：应降低强度、安抚并关心，不要继续加码。</string>
+    <string name="moan_mid">麦克风检测到玩家发出普通呻吟/呜呜声（音量中等）：挑逗等级可逐渐增加，小幅加码。</string>
+    <string name="moan_high_en">Mic picked up a loud moan/cry (high volume): lower intensity, soothe, don\'t push harder.</string>
+    <string name="moan_mid_en">Mic picked up a normal moan (medium volume): teasing can deepen a little.</string>
 </resources>

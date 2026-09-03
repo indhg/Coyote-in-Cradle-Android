@@ -61,7 +61,7 @@ class CameraObserver(private val context: Context) {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
         if (!granted) {
-            _state.value = CameraState(error = "相机权限未授予（仅聊天模式）")
+            _state.value = CameraState(error = context.getString(com.indhg.aiforcoyote.R.string.err_cam_perm))
             return
         }
         val future = ProcessCameraProvider.getInstance(context)
@@ -80,7 +80,7 @@ class CameraObserver(private val context: Context) {
                 Log.i(TAG, "摄像头已启动")
             } catch (e: Exception) {
                 Log.w(TAG, "摄像头启动失败: ${e.message}")
-                _state.value = CameraState(error = "摄像头启动失败: ${e.message}")
+                _state.value = CameraState(error = context.getString(com.indhg.aiforcoyote.R.string.err_cam_start, e.message ?: ""))
             }
         }, ContextCompat.getMainExecutor(context))
     }

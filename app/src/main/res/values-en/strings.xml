@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Coyote in Cradle</string>
+
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="clear">Clear</string>
+    <string name="send">Send</string>
+    <string name="disconnect">Disconnect</string>
+
+    <string name="lang_system">System</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="ui_language">UI language</string>
+    <string name="ui_language_note">Menus, buttons, and toasts. Not speech or read-aloud — this app has no TTS.</string>
+    <string name="script_language">Script language</string>
+    <string name="script_language_note">Only switches the AI character script (Chinese / English markdown). Not the app UI, and not speech — this app has no TTS.</string>
+    <string name="script_follow_hint">Scripts currently follow the UI language. Tap a script language below to set it separately.</string>
+    <string name="trial_script_mismatch">The built-in Trial script follows UI language. Script language only affects imported official themes.</string>
+
+    <string name="role_trial">Trial</string>
+    <string name="role_tentacle">Tentacle</string>
+    <string name="role_appraisal">Appraisal</string>
+    <string name="role_goblin">Goblin</string>
+    <string name="role_slime">Slime</string>
+    <string name="role_arachne">Arachne</string>
+    <string name="badge_start_here">Start here</string>
+    <string name="badge_pick">Pick</string>
+    <string name="badge_not_installed">Not installed</string>
+
+    <string name="intensity_tender">Tender</string>
+    <string name="intensity_dominant">Dominant</string>
+    <string name="intensity_rough">Rough</string>
+    <string name="intensity_with_level">Intensity %1$s</string>
+    <string name="chat_subtitle">%1$s · Intensity %2$s</string>
+
+    <string name="ai_model">AI model</string>
+    <string name="api_key_saved">Saved (leave blank to keep)</string>
+    <string name="api_key_paste">Paste your API key</string>
+    <string name="model_name">Model</string>
+    <string name="json_mode">JSON mode</string>
+    <string name="json_mode_hint">Some proxies don\'t support this — turn it off if needed</string>
+    <string name="test_connection">Test connection</string>
+    <string name="saved_now">Saved (applies now)</string>
+    <string name="conn_ok">Connected, model is ready</string>
+    <string name="conn_fail">Connection failed</string>
+    <string name="err_api_key">Invalid or missing API key. Official and proxy keys are not interchangeable — match Base URL and key.</string>
+    <string name="err_http_400">Request rejected (common on proxies). Check the model name, or turn off JSON mode.</string>
+    <string name="err_http">HTTP %1$d</string>
+
+    <string name="update">Updates</string>
+    <string name="update_available">%1$s is out — tap to download</string>
+    <string name="update_latest">Up to date (%1$s)</string>
+    <string name="update_none">No update check yet</string>
+    <string name="auto_check">Auto-check</string>
+
+    <string name="pair_coyote">Pair Coyote</string>
+    <string name="role_entry">Themes</string>
+    <string name="nick_section">Name (what the AI calls you)</string>
+    <string name="nick_label">Name</string>
+    <string name="save_nick">Save name</string>
+    <string name="nick_saved">Name saved</string>
+    <string name="observe_section">Sensors</string>
+    <string name="cap_section">Intensity cap (default 100, Coyote max 200)</string>
+    <string name="disclaimer">Adults only, consensual fiction. Do not use with heart conditions or a pacemaker.</string>
+    <string name="version_line">Coyote in Cradle v%1$s (build %2$d)</string>
+
+    <string name="tap_switch_role_intensity">Tap to switch theme and intensity</string>
+    <string name="roles">Themes</string>
+    <string name="tap_change_role">(tap to change)</string>
+    <string name="shock_intensity">Shock intensity (not dialogue)</string>
+    <string name="import_dlc">Install DLC (file picker)</string>
+    <string name="import_dlc_hint">Pick the zip or a .md. Current names: content/roles/&lt;theme&gt;-角色提示词.md (zh) or …-EN.md (en). Legacy -调教 packs are not supported.</string>
+
+    <string name="camera">Camera</string>
+    <string name="mic">Mic</string>
+    <string name="channel_n">Channel %1$s</string>
+
+    <string name="coyote_device">Coyote</string>
+    <string name="dev_connected">Connected</string>
+    <string name="dev_connected_bat">Connected · battery %1$d%%</string>
+    <string name="dev_scanning">Scanning… (power on the Coyote and keep it close)</string>
+    <string name="dev_connecting">Connecting…</string>
+    <string name="dev_disconnected">Disconnected</string>
+    <string name="dev_connect_steps">1) Power on the Coyote and keep it close  2) Tap Connect Coyote  3) Pick the strongest signal\nDon\'t use this while the official App is already connected.</string>
+    <string name="dev_pick_list">Tap a device (stronger signal first):</string>
+    <string name="dev_unnamed">Unnamed</string>
+    <string name="connect_coyote">Connect Coyote</string>
+    <string name="ble_direct_hint">BLE straight to the pulse box. No official App, no relay.</string>
+
+    <string name="err_no_bt">No Bluetooth on this phone</string>
+    <string name="err_bad_addr">Connect failed: bad address</string>
+    <string name="err_scan_fail">Scan failed code=%1$d</string>
+    <string name="err_coyote_not_found">No Coyote found (BLE name %1$s)%2$s</string>
+    <string name="err_scan_empty"> (no BLE devices nearby)</string>
+    <string name="err_scan_seen">; seen: %1$s</string>
+    <string name="err_missing_char">Missing characteristic — maybe not Coyote 3.0</string>
+    <string name="err_notify_fail">Notify subscribe failed</string>
+    <string name="err_cam_perm">Camera permission denied (chat only)</string>
+    <string name="err_cam_start">Camera failed: %1$s</string>
+    <string name="err_mic_perm">Mic permission denied (chat only)</string>
+    <string name="err_mic_unavailable">Mic unavailable</string>
+    <string name="err_mic_open">Couldn\'t open mic: %1$s</string>
+    <string name="err_mic_init">Mic init failed</string>
+    <string name="err_record">Record error: %1$s</string>
+
+    <string name="chat_coyote_on">Coyote connected</string>
+    <string name="chat_coyote_on_bat">Coyote connected %1$d%%</string>
+    <string name="chat_coyote_scan">Scanning for Coyote…</string>
+    <string name="chat_coyote_connecting">Connecting Coyote…</string>
+    <string name="chat_coyote_off">Coyote disconnected</string>
+    <string name="observing_on">Watching</string>
+    <string name="observing_off">Sensors off</string>
+    <string name="autopilot">Autopilot</string>
+    <string name="mic_off">Mic off</string>
+    <string name="observe_need_perm">Sensors off (grant camera/mic to enable)</string>
+    <string name="rage_n">Rage %1$d</string>
+    <string name="observing_wait">Watching you…</string>
+    <string name="input_hint">Say something, or say nothing…</string>
+    <string name="clear_title">Clear the chat?</string>
+    <string name="clear_body">This wipes the transcript and the AI\'s memory. Intensity stays.</string>
+
+    <string name="toast_need_api">Add an API key in Settings first</string>
+    <string name="toast_role_missing">\"%1$s\" isn\'t installed — import the DLC pack</string>
+    <string name="toast_role_fallback">\"%1$s\" isn\'t installed; switched back to Trial</string>
+    <string name="toast_cleared">Chat cleared</string>
+    <string name="toast_model_blank">The model wandered off… send again?</string>
+    <string name="toast_unknown_file">Unknown file</string>
+    <string name="toast_exception">Error (%1$s)</string>
+    <string name="toast_import_fail">Import finished, %1$d failed: %2$s</string>
+    <string name="toast_import_new">Installed: \"%1$s\" ready</string>
+    <string name="toast_import_ok">Import finished. If a theme is still grey, use a current DLC (no -调教 suffix) and matching script language.</string>
+    <string name="err_cant_read">Couldn\'t read the file</string>
+    <string name="err_cant_read_name">Couldn\'t read the file name</string>
+    <string name="err_legacy_pack">That\'s a legacy -调教/-凌辱 pack. Current DLC files have no suffix. Install DLC-zh v0.4.1 or DLC-en v0.4.0.</string>
+    <string name="err_no_role_md">No recognized theme scripts in the pack (need content/roles/&lt;theme&gt;-角色提示词.md)</string>
+    <string name="err_unknown_md">Unrecognized script file. Current names look like 触手-角色提示词.md / 触手-角色提示词-EN.md (no -调教 suffix)</string>
+    <string name="err_no_prompt">This theme has no script source</string>
+    <string name="err_role_load">\"%1$s\" isn\'t installed — import a DLC pack in Settings</string>
+
+    <string name="safety_stop_all">Stop all</string>
+    <string name="safety_clear_ch">%1$s cleared</string>
+    <string name="safety_clear_all">All cleared</string>
+    <string name="safety_need_ch_val">Missing channel or value</string>
+    <string name="safety_step">%1$s step %2$d exceeds %3$d</string>
+    <string name="safety_hold">%1$s intensity %2$d</string>
+    <string name="safety_need_ch">Missing channel</string>
+    <string name="safety_need_delta">Missing delta</string>
+    <string name="safety_need_wave">Missing channel or wave</string>
+    <string name="safety_wave">%1$s wave %2$s</string>
+    <string name="safety_unknown_op">Unknown op %1$s</string>
+
+    <string name="moan_high">Mic picked up a loud moan/cry (high volume): lower intensity, soothe, don\'t push harder.</string>
+    <string name="moan_mid">Mic picked up a normal moan (medium volume): teasing can deepen a little.</string>
+    <string name="moan_high_en">Mic picked up a loud moan/cry (high volume): lower intensity, soothe, don\'t push harder.</string>
+    <string name="moan_mid_en">Mic picked up a normal moan (medium volume): teasing can deepen a little.</string>
+</resources>

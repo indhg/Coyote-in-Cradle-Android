@@ -55,14 +55,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
+import com.indhg.aiforcoyote.LocalePrefs
 import com.indhg.aiforcoyote.MainViewModel
 import com.indhg.aiforcoyote.R
+import com.indhg.aiforcoyote.UiLabels
 import com.indhg.aiforcoyote.llm.Roles
 import com.indhg.aiforcoyote.ui.theme.Faint
 import com.indhg.aiforcoyote.ui.theme.Gold
@@ -93,6 +96,7 @@ private fun roleAvatarRes(role: String): Int = when (role) {
 fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val dlcRefresh by vm.dlcRefresh.collectAsState()
+    val context = LocalContext.current
     var apiKey by remember { mutableStateOf("") }
     var baseUrl by remember { mutableStateOf(settings.baseUrl) }
     var model by remember { mutableStateOf(settings.model) }
@@ -121,12 +125,30 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
+            Text(stringResource(R.string.settings), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onBack) { Text("返回", color = Muted) }
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back), color = Muted) }
         }
 
-        Text("AI 模型配置", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.ui_language), fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.ui_language_note), fontSize = 10.sp, lineHeight = 14.sp, color = Faint)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            listOf(
+                LocalePrefs.SYSTEM to stringResource(R.string.lang_system),
+                LocalePrefs.ZH to stringResource(R.string.lang_zh),
+                LocalePrefs.EN to stringResource(R.string.lang_en),
+            ).forEach { (code, label) ->
+                val selected = settings.uiLang == code
+                OutlinedButton(
+                    onClick = { vm.setUiLang(code) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(label, fontSize = 12.sp, color = if (selected) Gold else Muted)
+                }
+            }
+        }
+
+        Text(stringResource(R.string.ai_model), fontSize = 13.sp, color = Muted)
         OutlinedTextField(
             value = apiKey,
             onValueChange = { apiKey = it },
@@ -134,7 +156,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             label = { Text("API Key", fontSize = 12.sp) },
             placeholder = {
                 Text(
-                    if (settings.apiKey.isNotBlank()) "已保存（留空则保持不变）" else "粘贴你的 API Key",
+                    if (settings.apiKey.isNotBlank()) stringResource(R.string.api_key_saved) else stringResource(R.string.api_key_paste),
                     fontSize = 12.sp,
                     color = Faint,
                 )
@@ -153,7 +175,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             value = model,
             onValueChange = { model = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("模型名", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.model_name), fontSize = 12.sp) },
             colors = inputColors,
         )
         // JSON 模式开关：中转站不支持 json_object 时关闭（程序有兜底解析，400 也会自动降级重试）
@@ -162,10 +184,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("JSON 模式", fontSize = 13.sp, color = Muted)
+            Text(stringResource(R.string.json_mode), fontSize = 13.sp, color = Muted)
             Spacer(Modifier.width(8.dp))
             Text(
-                "部分中转站不兼容，可关闭",
+                stringResource(R.string.json_mode_hint),
                 fontSize = 10.sp,
                 color = Faint,
                 modifier = Modifier.weight(1f),
@@ -184,7 +206,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                         status = msg to ok
                     }
                 },
-            ) { Text("测试连接", fontSize = 13.sp, color = Muted) }
+            ) { Text(stringResource(R.string.test_connection), fontSize = 13.sp, color = Muted) }
             Button(
                 onClick = {
                     val key = apiKey.ifBlank { settings.apiKey }
@@ -197,10 +219,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                         )
                     }
                     apiKey = ""
-                    status = "已保存（立即生效）" to true
+                    status = context.getString(R.string.saved_now) to true
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Ink),
-            ) { Text("保存", fontWeight = FontWeight.Bold) }
+            ) { Text(stringResource(R.string.save), fontWeight = FontWeight.Bold) }
         }
         status?.let { (msg, ok) ->
             Text(msg, fontSize = 12.sp, color = if (ok) Gold else Color(0xFFE06C5A))
@@ -208,9 +230,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
 
         // 更新检测：进设置页查一次 + 开关 + 发现新版本跳 GitHub
         val updateInfo by vm.updateInfo.collectAsState()
-        val context = LocalContext.current
         LaunchedEffect(Unit) { vm.refreshUpdate() }
-        Text("更新", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.update), fontSize = 13.sp, color = Muted)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -218,7 +239,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 if (updateInfo.available && updateInfo.url.isNotBlank()) {
                     Text(
-                        "发现新版本 ${updateInfo.latest}，点击下载",
+                        stringResource(R.string.update_available, updateInfo.latest),
                         fontSize = 12.sp,
                         color = Gold,
                         modifier = Modifier.clickable {
@@ -227,13 +248,13 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     )
                 } else {
                     Text(
-                        if (updateInfo.latest.isNotBlank()) "已是最新（${updateInfo.latest}）" else "尚未检查到更新",
+                        if (updateInfo.latest.isNotBlank()) stringResource(R.string.update_latest, updateInfo.latest) else stringResource(R.string.update_none),
                         fontSize = 12.sp,
                         color = Faint,
                     )
                 }
             }
-            Text("自动检查", fontSize = 11.sp, color = Muted)
+            Text(stringResource(R.string.auto_check), fontSize = 11.sp, color = Muted)
             Spacer(Modifier.width(8.dp))
             Switch(
                 checked = settings.checkUpdate,
@@ -246,49 +267,54 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(4.dp))
-        Text("配对郊狼", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.pair_coyote), fontSize = 13.sp, color = Muted)
         DeviceSection(vm)
 
-        Text("角色入口", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.role_entry), fontSize = 13.sp, color = Muted)
         ThemeCard(
             vm = vm,
             role = settings.role,
             intensityLevel = settings.intensityLevel,
             contentLang = settings.contentLang,
+            scriptFollowUi = settings.scriptFollowUi,
             trialBadgeSeen = settings.trialBadgeSeen,
             dlcRefresh = dlcRefresh,
             onImport = { pickLauncher.launch(Unit) },
         )
 
-        Text("称谓（AI 怎么叫你）", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.nick_section), fontSize = 13.sp, color = Muted)
         OutlinedTextField(
             value = nick,
             onValueChange = { nick = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("称谓", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.nick_label), fontSize = 12.sp) },
             colors = inputColors,
         )
         TextButton(
             onClick = {
                 vm.updateSettings { it.copy(nick = nick.trim().ifBlank { it.nick }) }
-                status = "昵称已保存" to true
+                status = context.getString(R.string.nick_saved) to true
             },
-        ) { Text("保存昵称", fontSize = 13.sp, color = Muted) }
+        ) { Text(stringResource(R.string.save_nick), fontSize = 13.sp, color = Muted) }
 
-        Text("观察开关", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.observe_section), fontSize = 13.sp, color = Muted)
         SensorSection(vm)
 
-        Text("强度上限（默认 100，郊狼满值 200）", fontSize = 13.sp, color = Muted)
+        Text(stringResource(R.string.cap_section), fontSize = 13.sp, color = Muted)
         CapSection(vm)
 
         Text(
-            "仅供成年人、双方自愿的虚构角色扮演使用。心脏病、心脏起搏器等健康风险人群请勿使用。",
+            stringResource(R.string.disclaimer),
             fontSize = 11.sp,
             lineHeight = 16.sp,
             color = Faint,
         )
         Text(
-            "Coyote in Cradle v${com.indhg.aiforcoyote.BuildConfig.VERSION_NAME}（build ${com.indhg.aiforcoyote.BuildConfig.VERSION_CODE}）",
+            stringResource(
+                R.string.version_line,
+                com.indhg.aiforcoyote.BuildConfig.VERSION_NAME,
+                com.indhg.aiforcoyote.BuildConfig.VERSION_CODE,
+            ),
             fontSize = 11.sp,
             color = Faint,
         )
@@ -302,6 +328,7 @@ private fun ThemeCard(
     role: String,
     intensityLevel: String,
     contentLang: String,
+    scriptFollowUi: Boolean,
     trialBadgeSeen: Boolean,
     dlcRefresh: Int,
     onImport: () -> Unit,
@@ -310,6 +337,7 @@ private fun ThemeCard(
     var roleListOpen by remember { mutableStateOf(false) }
     val current = Roles.find(role) ?: Roles.ALL.first()
     val (lvColor, lvBg) = levelColors(intensityLevel)
+    val ctx = LocalContext.current
     // 读取 dlcRefresh：导入成功后父级递增，本卡重组并重扫 content/roles
     @Suppress("UNUSED_VARIABLE")
     val importGen = dlcRefresh
@@ -333,10 +361,10 @@ private fun ThemeCard(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(current.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                    Text(UiLabels.role(ctx, current.name), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextMain)
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "强度 $intensityLevel",
+                        stringResource(R.string.intensity_with_level, UiLabels.intensity(ctx, intensityLevel)),
                         modifier = Modifier
                             .background(lvBg, RoundedCornerShape(5.dp))
                             .padding(horizontal = 6.dp, vertical = 1.dp),
@@ -344,7 +372,7 @@ private fun ThemeCard(
                         color = lvColor,
                     )
                 }
-                Text("点击切换角色与电击强度", fontSize = 11.sp, color = Faint)
+                Text(stringResource(R.string.tap_switch_role_intensity), fontSize = 11.sp, color = Faint)
             }
         }
         DropdownMenu(
@@ -354,7 +382,7 @@ private fun ThemeCard(
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             Column(Modifier.width(280.dp).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("角色", fontSize = 11.sp, color = Muted)
+                Text(stringResource(R.string.roles), fontSize = 11.sp, color = Muted)
                 if (!roleListOpen) {
                     Row(
                         modifier = Modifier
@@ -369,8 +397,8 @@ private fun ThemeCard(
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(current.name, fontSize = 13.sp, color = TextMain, modifier = Modifier.weight(1f))
-                        Text("（点击换角色）", fontSize = 10.sp, color = Faint)
+                        Text(UiLabels.role(ctx, current.name), fontSize = 13.sp, color = TextMain, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.tap_change_role), fontSize = 10.sp, color = Faint)
                     }
                 } else {
                     Roles.ALL.forEach { r ->
@@ -396,19 +424,19 @@ private fun ThemeCard(
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    r.name,
+                                    UiLabels.role(ctx, r.name),
                                     fontSize = 13.sp,
                                     color = if (usable) TextMain else Faint,
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     if (r.trial && !trialBadgeSeen) {
-                                        Text("新手推荐", fontSize = 10.sp, color = Gold)
+                                        Text(stringResource(R.string.badge_start_here), fontSize = 10.sp, color = Gold)
                                     }
                                     if (r.recommended && usable) {
-                                        Text("推荐", fontSize = 10.sp, color = Gold)
+                                        Text(stringResource(R.string.badge_pick), fontSize = 10.sp, color = Gold)
                                     }
                                     if (!usable) {
-                                        Text("未导入", fontSize = 10.sp, color = Faint)
+                                        Text(stringResource(R.string.badge_not_installed), fontSize = 10.sp, color = Faint)
                                     }
                                 }
                             }
@@ -417,7 +445,7 @@ private fun ThemeCard(
                 }
 
                 Spacer(Modifier.height(2.dp))
-                Text("电击强度（与对话内容无关）", fontSize = 11.sp, color = Muted)
+                Text(stringResource(R.string.shock_intensity), fontSize = 11.sp, color = Muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Roles.INTENSITY_LEVELS.forEach { lv ->
                         val selected = lv == intensityLevel
@@ -430,15 +458,19 @@ private fun ThemeCard(
                                 contentColor = if (selected) Ink else c,
                             ),
                         ) {
-                            Text(lv, fontSize = 12.sp)
+                            Text(UiLabels.intensity(ctx, lv), fontSize = 12.sp)
                         }
                     }
                 }
 
                 Spacer(Modifier.height(2.dp))
-                Text("内容语言", fontSize = 11.sp, color = Muted)
+                Text(stringResource(R.string.script_language), fontSize = 11.sp, color = Muted)
+                Text(stringResource(R.string.script_language_note), fontSize = 10.sp, lineHeight = 14.sp, color = Faint)
+                if (scriptFollowUi) {
+                    Text(stringResource(R.string.script_follow_hint), fontSize = 10.sp, color = Gold)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(Roles.LANG_ZH to "中文", Roles.LANG_EN to "English").forEach { (code, label) ->
+                    listOf(Roles.LANG_ZH to stringResource(R.string.lang_zh), Roles.LANG_EN to stringResource(R.string.lang_en)).forEach { (code, label) ->
                         val selected = contentLang == code
                         OutlinedButton(
                             onClick = { vm.setContentLang(code) },
@@ -460,9 +492,9 @@ private fun ThemeCard(
                         onImport()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("导入 DLC（打开文件管理）", fontSize = 12.sp, color = Muted) }
+                ) { Text(stringResource(R.string.import_dlc), fontSize = 12.sp, color = Muted) }
                 Text(
-                    "解压或直接选 zip。现行包文件名：content/roles/<角色>-角色提示词.md（中文）或 …-EN.md（英文）。旧 -调教 包不再支持。",
+                    stringResource(R.string.import_dlc_hint),
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
                     color = Faint,
@@ -481,13 +513,13 @@ private fun SensorSection(vm: MainViewModel) {
     val audioState by vm.audioState.collectAsState()
 
     SensorRow(
-        label = "摄像头",
+        label = stringResource(R.string.camera),
         on = camSwitch,
         err = if (camSwitch && !camState.enabled && camState.error.isNotEmpty()) camState.error else "",
         onChange = { vm.setCamSwitch(it) },
     )
     SensorRow(
-        label = "麦克风",
+        label = stringResource(R.string.mic),
         on = micSwitch,
         err = if (micSwitch && !audioState.running && audioState.error.isNotEmpty()) audioState.error else "",
         onChange = { vm.setMicSwitch(it) },
@@ -527,7 +559,7 @@ private fun CapSection(vm: MainViewModel) {
         val cap = caps[ch] ?: 100
         var draft by remember(cap) { mutableStateOf(cap) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$ch 通道", fontSize = 14.sp, color = TextMain, modifier = Modifier.width(56.dp))
+            Text(stringResource(R.string.channel_n, ch), fontSize = 14.sp, color = TextMain, modifier = Modifier.width(72.dp))
             Slider(
                 value = draft.toFloat(),
                 onValueChange = { draft = it.toInt() },
@@ -549,13 +581,14 @@ private fun DeviceSection(vm: MainViewModel) {
         if (granted.values.all { it }) vm.connectDevice()
     }
     val statusText = when (device.status) {
-        "connected" -> "已连接" + (device.battery?.let { " · 电量 $it%" } ?: "")
-        "scanning" -> "扫描中…（郊狼需开机且靠近手机）"
-        "connecting" -> "连接中…"
-        else -> "未连接"
+        "connected" -> device.battery?.let { stringResource(R.string.dev_connected_bat, it) }
+            ?: stringResource(R.string.dev_connected)
+        "scanning" -> stringResource(R.string.dev_scanning)
+        "connecting" -> stringResource(R.string.dev_connecting)
+        else -> stringResource(R.string.dev_disconnected)
     }
     val scanDevices by vm.scanDevices.collectAsState()
-    Text("郊狼设备", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
+    Text(stringResource(R.string.coyote_device), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Gold)
     Spacer(Modifier.height(6.dp))
     Text(statusText, fontSize = 12.sp, color = if (device.status == "connected") Gold else Muted)
     if (device.error.isNotEmpty()) {
@@ -565,7 +598,7 @@ private fun DeviceSection(vm: MainViewModel) {
     if (device.status != "connected") {
         Spacer(Modifier.height(6.dp))
         Text(
-            "连接步骤：① 郊狼开机并靠近手机 ② 点「连接郊狼」 ③ 扫描列表里点信号最强的设备\n请不要在官方 App 已连接郊狼的情况下使用。",
+            stringResource(R.string.dev_connect_steps),
             fontSize = 11.sp,
             lineHeight = 15.sp,
             color = Faint,
@@ -573,11 +606,11 @@ private fun DeviceSection(vm: MainViewModel) {
     }
     if (device.status == "scanning" && scanDevices.isNotEmpty()) {
         Spacer(Modifier.height(6.dp))
-        Text("点选设备直连（信号强的在前）：", fontSize = 11.sp, color = Faint)
+        Text(stringResource(R.string.dev_pick_list), fontSize = 11.sp, color = Faint)
         scanDevices.take(8).forEach { d ->
             TextButton(onClick = { vm.connectToDeviceByAddr(d.address) }) {
                 Text(
-                    "${d.name ?: "无名设备"}  ${d.address}  ${d.rssi}dBm",
+                    "${d.name ?: stringResource(R.string.dev_unnamed)}  ${d.address}  ${d.rssi}dBm",
                     fontSize = 11.sp,
                     color = Muted,
                 )
@@ -586,7 +619,7 @@ private fun DeviceSection(vm: MainViewModel) {
     }
     Spacer(Modifier.height(8.dp))
     if (device.status == "connected") {
-        OutlinedButton(onClick = { vm.disconnectDevice() }) { Text("断开", fontSize = 13.sp, color = Muted) }
+        OutlinedButton(onClick = { vm.disconnectDevice() }) { Text(stringResource(R.string.disconnect), fontSize = 13.sp, color = Muted) }
     } else {
         Button(
             onClick = {
@@ -602,10 +635,10 @@ private fun DeviceSection(vm: MainViewModel) {
             },
             enabled = device.status != "scanning" && device.status != "connecting",
             colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Ink),
-        ) { Text("连接郊狼", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        ) { Text(stringResource(R.string.connect_coyote), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
     }
     Spacer(Modifier.height(4.dp))
-    Text("蓝牙直连脉冲主机，无需郊狼 App 与中继。", fontSize = 11.sp, color = Faint)
+    Text(stringResource(R.string.ble_direct_hint), fontSize = 11.sp, color = Faint)
 }
 
 /**

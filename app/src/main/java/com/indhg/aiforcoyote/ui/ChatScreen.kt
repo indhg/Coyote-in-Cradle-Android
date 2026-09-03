@@ -46,10 +46,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.indhg.aiforcoyote.MainViewModel
+import com.indhg.aiforcoyote.R
+import com.indhg.aiforcoyote.UiLabels
 import com.indhg.aiforcoyote.UiMsg
 import com.indhg.aiforcoyote.ui.theme.Bad
 import com.indhg.aiforcoyote.ui.theme.Faint
@@ -79,11 +83,13 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     var showClearConfirm by remember { mutableStateOf(false) }
 
     val pairLabel = when (device.status) {
-        "connected" -> "郊狼已连接" + (device.battery?.let { " $it%" } ?: "")
-        "scanning" -> "扫描郊狼中…"
-        "connecting" -> "连接郊狼中…"
-        else -> "郊狼未连接"
+        "connected" -> device.battery?.let { stringResource(R.string.chat_coyote_on_bat, it) }
+            ?: stringResource(R.string.chat_coyote_on)
+        "scanning" -> stringResource(R.string.chat_coyote_scan)
+        "connecting" -> stringResource(R.string.chat_coyote_connecting)
+        else -> stringResource(R.string.chat_coyote_off)
     }
+    val ctx = LocalContext.current
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -111,17 +117,17 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Coyote in Cradle", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Gold)
                 Text(
-                    buildString {
-                        append(settings.role)
-                        append(" · 强度")
-                        append(settings.intensityLevel)
-                    },
+                    stringResource(
+                        R.string.chat_subtitle,
+                        UiLabels.role(ctx, settings.role),
+                        UiLabels.intensity(ctx, settings.intensityLevel),
+                    ),
                     fontSize = 12.sp,
                     color = Muted,
                 )
             }
-            TextButton(onClick = { showClearConfirm = true }) { Text("清空", color = Muted) }
-            TextButton(onClick = onOpenSettings) { Text("设置", color = Muted) }
+            TextButton(onClick = { showClearConfirm = true }) { Text(stringResource(R.string.clear), color = Muted) }
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings), color = Muted) }
         }
 
         // 状态行：A/B 强度 + 自动运行开关
@@ -142,12 +148,12 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                if (obsOn) "观察中" else "观察关",
+                if (obsOn) stringResource(R.string.observing_on) else stringResource(R.string.observing_off),
                 fontSize = 12.sp,
                 color = if (obsOn) Gold else Muted,
             )
             Spacer(Modifier.weight(1f))
-            Text("自动运行", fontSize = 12.sp, color = Muted)
+            Text(stringResource(R.string.autopilot), fontSize = 12.sp, color = Muted)
             Spacer(Modifier.width(4.dp))
             Switch(
                 checked = settings.autopilot,
@@ -164,7 +170,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (audioState.enabled) {
-                Text("麦克风", fontSize = 11.sp, color = Muted)
+                Text(stringResource(R.string.mic), fontSize = 11.sp, color = Muted)
                 Spacer(Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
@@ -185,14 +191,14 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
             } else {
                 Text(
-                    if (obsOn) "麦克风关" else "观察关（授权相机/麦克风后开启）",
+                    if (obsOn) stringResource(R.string.mic_off) else stringResource(R.string.observe_need_perm),
                     fontSize = 11.sp,
                     color = Faint,
                 )
                 Spacer(Modifier.weight(1f))
             }
             Text(
-                "怒气 $rage",
+                stringResource(R.string.rage_n, rage),
                 fontSize = 12.sp,
                 color = when {
                     rage >= 5 -> Bad
@@ -218,7 +224,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Gold)
                         Spacer(Modifier.width(8.dp))
-                        Text("触手正在观察……", fontSize = 12.sp, color = Faint)
+                        Text(stringResource(R.string.observing_wait), fontSize = 12.sp, color = Faint)
                     }
                 }
             }
@@ -235,7 +241,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("说点什么，或什么都不说……", fontSize = 13.sp, color = Faint) },
+                placeholder = { Text(stringResource(R.string.input_hint), fontSize = 13.sp, color = Faint) },
                 maxLines = 3,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Gold,
@@ -254,7 +260,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Ink),
             ) {
-                Text("发送", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.send), fontWeight = FontWeight.Bold)
             }
         }
         }
@@ -270,15 +276,15 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
         if (showClearConfirm) {
             AlertDialog(
                 onDismissRequest = { showClearConfirm = false },
-                title = { Text("清空对话历史？", fontSize = 16.sp, color = TextMain) },
-                text = { Text("将清空聊天记录与 AI 的记忆上下文，设备强度不受影响。", fontSize = 13.sp, color = Muted) },
+                title = { Text(stringResource(R.string.clear_title), fontSize = 16.sp, color = TextMain) },
+                text = { Text(stringResource(R.string.clear_body), fontSize = 13.sp, color = Muted) },
                 confirmButton = {
                     TextButton(onClick = { showClearConfirm = false; vm.clearHistory() }) {
-                        Text("清空", color = Bad)
+                        Text(stringResource(R.string.clear), color = Bad)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showClearConfirm = false }) { Text("取消", color = Muted) }
+                    TextButton(onClick = { showClearConfirm = false }) { Text(stringResource(R.string.cancel), color = Muted) }
                 },
             )
         }

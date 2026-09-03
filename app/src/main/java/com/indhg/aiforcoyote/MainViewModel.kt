@@ -33,12 +33,16 @@ data class UiMsg(val role: String, val text: String, val note: String = "")
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
+    private fun s(id: Int, vararg args: Any): String =
+        getApplication<Application>().getString(id, *args)
+
+
     private val repo = SettingsRepository(app)
     private val client = DeepSeekClient()
 
     private var safetyRef: Safety? = null
     private val ble = BleCoyote(app, viewModelScope, onDisconnect = { viewModelScope.launch { safetyRef?.reset() } })
-    private val safety = Safety(ble)
+    private val safety = Safety(ble, app)
 
     val deviceState: StateFlow<DeviceState> = ble.state
     val scanDevices: StateFlow<List<ScanDevice>> = ble.scanDevices
@@ -168,7 +172,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** 切换角色入口（未导入拦截 + 提示）。点过任意入口后体验版「新手推荐」角标消失。 */
     fun setRole(role: String) {
         if (!roleUsable(role)) {
-            _toast.value = "「${Roles.find(role)?.name ?: role}」未导入：先导入对应 DLC 包"
+            _toast.value = s(R.string.toast_role_missing, UiLabels.role(getApplication(), role))
             return
         }
         updateSettings { it.copy(role = role, trialBadgeSeen = true) }
@@ -180,15 +184,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         updateSettings { it.copy(intensityLevel = level) }
     }
 
-    /** 内容语言：zh 读无后缀稿，en 读 -EN.md；切语言后若当前入口不可用则回体验版。 */
+    /** 角色稿语言（与界面语言独立）。手动指定后不再跟随界面。 */
     fun setContentLang(lang: String) {
         if (lang != Roles.LANG_ZH && lang != Roles.LANG_EN) return
+        val app = getApplication<Application>()
+        val ui = LocalePrefs.resolved(app)
         updateSettings { cur ->
-            val next = cur.copy(contentLang = lang)
-            val still = Roles.find(cur.role)?.available(getApplication(), lang) == true
-            if (still) next else next.copy(role = "体验版")
+            val next = cur.copy(contentLang = lang, scriptFollowUi = false)
+            val still = Roles.find(cur.role)?.available(app, lang) == true
+            val adjusted = if (still) next else next.copy(role = "体验版")
+            adjusted
+        }
+        if (ui == Roles.LANG_ZH && lang == Roles.LANG_EN) {
+            _toast.value = s(R.string.trial_script_mismatch)
         }
         _dlcRefresh.value++
+    }
+
+    /** 界面语言：system / zh / en。默认跟随系统；切换后 AppCompat 重建 Activity。 */
+    fun setUiLang(tag: String) {
+        val v = if (tag == LocalePrefs.ZH || tag == LocalePrefs.EN) tag else LocalePrefs.SYSTEM
+        val app = getApplication<Application>()
+        LocalePrefs.set(app, v)
+        val resolved = LocalePrefs.resolved(app)
+        updateSettings { cur ->
+            var next = cur.copy(uiLang = v)
+            if (cur.scriptFollowUi) {
+                next = next.copy(contentLang = resolved)
+                val still = Roles.find(next.role)?.available(app, next.contentLang) == true
+                if (!still) next = next.copy(role = "体验版")
+            }
+            next
+        }
+        LocalePrefs.apply(v)
     }
 
     /** 调教版 DLC：导入单个文件（zip 解出全部 .md / 单 md 按真实文件名）。分享入口用。 */
@@ -202,12 +230,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val before = Roles.ALL.filter { it.available(app, lang) }.map { it.name }.toSet()
         val failures = mutableListOf<String>()
         for (uri in uris) {
-            val display = queryDisplayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: "未知文件"
+            val display = queryDisplayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: s(R.string.toast_unknown_file)
             val reason = try {
                 if (display.endsWith(".zip", ignoreCase = true)) importDlcZip(app, uri)
                 else importDlcMd(app, uri)
             } catch (e: Exception) {
-                "异常（${e.message}）"
+                s(R.string.toast_exception, e.message ?: "")
             }
             if (reason != null) failures += "$display：$reason"
         }
@@ -215,9 +243,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val after = Roles.ALL.filter { it.available(app, lang) }.map { it.name }.toSet()
         val newRoles = (after - before).toList()
         _toast.value = when {
-            failures.isNotEmpty() -> "导入完成，失败 ${failures.size} 项：${failures.joinToString("；")}"
-            newRoles.isNotEmpty() -> "已导入：「${newRoles.joinToString("、")}」可用"
-            else -> "导入完成。若仍显示未导入，请确认是现行 DLC（无 -调教 后缀）且语言档匹配。"
+            failures.isNotEmpty() -> s(R.string.toast_import_fail, failures.size, failures.joinToString("；"))
+            newRoles.isNotEmpty() -> s(R.string.toast_import_new, newRoles.joinToString("、") { UiLabels.role(app, it) })
+            else -> s(R.string.toast_import_ok)
         }
         return failures.isEmpty()
     }
@@ -265,26 +293,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     entry = zip.nextEntry
                 }
             }
-        } ?: return "无法读取文件"
+        } ?: return s(R.string.err_cant_read)
         return when {
             accepted > 0 -> null
-            skippedLegacy > 0 -> "这是旧档位包（-调教/-凌辱），现行 DLC 文件名无后缀。请安装 DLC-zh v0.4.1 或 DLC-en v0.4.0"
-            else -> "包里没有可识别的角色稿（需要 content/roles/<角色>-角色提示词.md）"
+            skippedLegacy > 0 -> s(R.string.err_legacy_pack)
+            else -> s(R.string.err_no_role_md)
         }
     }
 
     /** 单 md：仅接受现行文件名，落入 content/roles。 */
     private fun importDlcMd(app: Application, uri: Uri): String? {
-        val name = (queryDisplayName(uri) ?: uri.lastPathSegment)?.substringAfterLast('/') ?: return "无法读取文件名"
+        val name = (queryDisplayName(uri) ?: uri.lastPathSegment)?.substringAfterLast('/') ?: return s(R.string.err_cant_read_name)
         if (name !in Roles.KNOWN_DLC_FILES) {
-            return "未识别的提示词文件。现行文件名如 触手-角色提示词.md / 触手-角色提示词-EN.md（无 -调教 后缀）"
+            return s(R.string.err_unknown_md)
         }
         val dir = Roles.contentRolesDir(app)
         dir.mkdirs()
         val target = java.io.File(dir, name)
         app.contentResolver.openInputStream(uri)?.use { ins ->
             target.outputStream().use { out -> ins.copyTo(out) }
-        } ?: return "无法读取文件"
+        } ?: return s(R.string.err_cant_read)
         return null
     }
 
@@ -299,10 +327,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (notes.size > 5) notes.removeAt(0)
     }
 
-    private fun moanText(kind: String): String = if (kind == "high") {
-        "麦克风检测到玩家发出较大的呻吟/惨叫（音量高）：应降低强度、安抚并关心，不要继续加码。"
-    } else {
-        "麦克风检测到玩家发出普通呻吟/呜呜声（音量中等）：挑逗等级可逐渐增加，小幅加码。"
+    private fun moanText(kind: String): String {
+        val en = _settings.value.contentLang == Roles.LANG_EN
+        return if (kind == "high") {
+            if (en) s(R.string.moan_high_en) else s(R.string.moan_high)
+        } else {
+            if (en) s(R.string.moan_mid_en) else s(R.string.moan_mid)
+        }
     }
 
     fun clearToast() {
@@ -313,7 +344,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun clearHistory() {
         _messages.value = emptyList()
         history.clear()
-        _toast.value = "对话历史已清空"
+        _toast.value = s(R.string.toast_cleared)
     }
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -327,8 +358,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun testConnection(apiKey: String, baseUrl: String, model: String, onDone: (String, Boolean) -> Unit) {
         viewModelScope.launch {
             val r = client.test(baseUrl, apiKey, model)
-            r.onSuccess { onDone(it, true) }
-            r.onFailure { onDone(it.message ?: "连接失败", false) }
+            r.onSuccess { onDone(s(R.string.conn_ok), true) }
+            r.onFailure { e ->
+                val msg = when (e.message) {
+                    "401" -> s(R.string.err_api_key)
+                    "400" -> s(R.string.err_http_400)
+                    else -> e.message ?: s(R.string.conn_fail)
+                }
+                onDone(msg, false)
+            }
         }
     }
 
@@ -345,7 +383,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val s = _settings.value
         try {
             if (s.apiKey.isBlank()) {
-                _toast.value = "请先在设置页填写 API Key"
+                _toast.value = s(R.string.toast_need_api)
                 _busy.value = false
                 return
             }
@@ -359,7 +397,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _rage.value = rageRounds
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
             if (!roleUsable(s.role)) {
-                _toast.value = "「${s.role}」未导入，已切回体验版"
+                _toast.value = s(R.string.toast_role_fallback, UiLabels.role(getApplication(), s.role))
                 updateSettings { it.copy(role = "体验版") }
                 _busy.value = false
                 return
@@ -367,6 +405,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val system = SystemPrompt.build(
                 getApplication(), s.role, s.nick,
                 lang = s.contentLang,
+                uiLang = LocalePrefs.resolved(getApplication()),
                 cameraEnabled = cs.enabled,
                 rageRounds = rageRounds,
                 notes = notes.toList(),
@@ -395,7 +434,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             else history += ("（自动运行）" to result.line)
             if (history.size > 20) history.removeAt(0)
         } catch (e: Exception) {
-            _messages.value = _messages.value + UiMsg("ai", "模型走神了……再发一次？", e.message ?: "")
+            _messages.value = _messages.value + UiMsg("ai", s(R.string.toast_model_blank), e.message ?: "")
         } finally {
             _busy.value = false
         }

@@ -65,7 +65,7 @@ class AudioObserver(
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         if (!granted) {
-            _state.value = AudioState(error = "麦克风权限未授予（仅聊天模式）")
+            _state.value = AudioState(error = context.getString(com.indhg.aiforcoyote.R.string.err_mic_perm))
             return
         }
         job = scope.launch(Dispatchers.IO) {
@@ -73,7 +73,7 @@ class AudioObserver(
                 SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
             )
             if (minBuf <= 0) {
-                _state.value = AudioState(error = "麦克风不可用")
+                _state.value = AudioState(error = context.getString(com.indhg.aiforcoyote.R.string.err_mic_unavailable))
                 return@launch
             }
             val rec = try {
@@ -82,11 +82,11 @@ class AudioObserver(
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf * 2,
                 )
             } catch (e: Exception) {
-                _state.value = AudioState(error = "麦克风打开失败: ${e.message}")
+                _state.value = AudioState(error = context.getString(com.indhg.aiforcoyote.R.string.err_mic_open, e.message ?: ""))
                 return@launch
             }
             if (rec.state != AudioRecord.STATE_INITIALIZED) {
-                _state.value = AudioState(error = "麦克风初始化失败")
+                _state.value = AudioState(error = context.getString(com.indhg.aiforcoyote.R.string.err_mic_init))
                 return@launch
             }
             try {
@@ -109,7 +109,7 @@ class AudioObserver(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "录音异常: ${e.message}")
-                _state.value = _state.value.copy(error = "录音异常: ${e.message}")
+                _state.value = _state.value.copy(error = context.getString(com.indhg.aiforcoyote.R.string.err_record, e.message ?: ""))
             } finally {
                 try {
                     rec.stop()

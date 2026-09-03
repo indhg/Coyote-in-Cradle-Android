@@ -63,7 +63,7 @@ class DeepSeekClient {
                         .build()
                 ).execute()
                 if (resp.isSuccessful) {
-                    Result.success("连接成功，模型可用")
+                    Result.success("ok")
                 } else {
                     Result.failure(friendlyError(resp.code))
                 }
@@ -217,8 +217,8 @@ class DeepSeekClient {
 
     /** 把常见 HTTP 错误翻译成人话（官方与中转站密钥不通用、中转站不支持 JSON 模式等）。 */
     private fun friendlyError(code: Int): IOException = when (code) {
-        401 -> IOException("API Key 无效或未填：官方与中转站的密钥不通用，请确认 Base URL 与密钥配套")
-        400 -> IOException("请求参数不被支持（中转站常见）：请核对模型名，或关闭 JSON 模式")
+        401 -> IOException("401")
+        400 -> IOException("400")
         else -> IOException("HTTP $code")
     }
 

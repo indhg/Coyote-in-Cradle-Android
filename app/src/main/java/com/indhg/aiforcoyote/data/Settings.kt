@@ -1,4 +1,4 @@
-package com.indhg.aiforcoyote.data
+﻿package com.indhg.aiforcoyote.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -48,7 +48,7 @@ class SettingsRepository(private val context: Context) {
                 if (follow || stored == null) {
                     val ui = p[KEY_UI_LANG]?.takeIf { it == "zh" || it == "en" || it == "system" } ?: "system"
                     if (ui == "en") Roles.LANG_EN else if (ui == "zh") Roles.LANG_ZH else
-                        if (java.util.Locale.getDefault().language.lowercase().startsWith("zh")) Roles.LANG_ZH else Roles.LANG_EN
+                        if (com.indhg.aiforcoyote.LocalePrefs.systemLanguage().startsWith("zh")) Roles.LANG_ZH else Roles.LANG_EN
                 } else stored
             },
             autopilot = p[KEY_AUTOPILOT] ?: true,

@@ -131,14 +131,14 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
 
         Text(stringResource(R.string.ui_language), fontSize = 13.sp, color = Muted)
-        Text(stringResource(R.string.ui_language_note), fontSize = 10.sp, lineHeight = 14.sp, color = Faint)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             listOf(
                 LocalePrefs.SYSTEM to stringResource(R.string.lang_system),
                 LocalePrefs.ZH to stringResource(R.string.lang_zh),
                 LocalePrefs.EN to stringResource(R.string.lang_en),
             ).forEach { (code, label) ->
-                val selected = settings.uiLang == code
+                // 以 LocalePrefs 为准：DataStore 异步写入时 settings.uiLang 可能短暂滞后
+                val selected = LocalePrefs.get(context) == code
                 OutlinedButton(
                     onClick = { vm.setUiLang(code) },
                     modifier = Modifier.weight(1f),
@@ -637,8 +637,6 @@ private fun DeviceSection(vm: MainViewModel) {
             colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Ink),
         ) { Text(stringResource(R.string.connect_coyote), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
     }
-    Spacer(Modifier.height(4.dp))
-    Text(stringResource(R.string.ble_direct_hint), fontSize = 11.sp, color = Faint)
 }
 
 /**

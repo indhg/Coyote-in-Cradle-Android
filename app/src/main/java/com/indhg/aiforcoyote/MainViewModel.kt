@@ -201,22 +201,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _dlcRefresh.value++
     }
 
-    /** 界面语言：system / zh / en。默认跟随系统；切换后 AppCompat 重建 Activity。 */
+    /** 界面语言：system / zh / en。默认跟随系统；切换后 AppCompat 重建 Activity。
+     * 必须先等 DataStore 写入完成再 setApplicationLocales，否则重建时 collect 到旧 uiLang/contentLang，
+     * 表现为按钮高亮/角色稿语言与界面语言不一致（中英切换异常）。 */
     fun setUiLang(tag: String) {
         val v = if (tag == LocalePrefs.ZH || tag == LocalePrefs.EN) tag else LocalePrefs.SYSTEM
         val app = getApplication<Application>()
         LocalePrefs.set(app, v)
         val resolved = LocalePrefs.resolved(app)
-        updateSettings { cur ->
-            var next = cur.copy(uiLang = v)
-            if (cur.scriptFollowUi) {
-                next = next.copy(contentLang = resolved)
-                val still = Roles.find(next.role)?.available(app, next.contentLang) == true
-                if (!still) next = next.copy(role = "体验版")
+        viewModelScope.launch {
+            repo.update { cur ->
+                var next = cur.copy(uiLang = v)
+                if (cur.scriptFollowUi) {
+                    next = next.copy(contentLang = resolved)
+                    val still = Roles.find(next.role)?.available(app, next.contentLang) == true
+                    if (!still) next = next.copy(role = "体验版")
+                }
+                next
             }
-            next
+            LocalePrefs.apply(v)
         }
-        LocalePrefs.apply(v)
     }
 
     /** 调教版 DLC：导入单个文件（zip 解出全部 .md / 单 md 按真实文件名）。分享入口用。 */
@@ -431,7 +435,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }.trimEnd()
             _messages.value = _messages.value + UiMsg("ai", result.line, note)
             if (userText != null) history += (userText to result.line)
-            else history += ("（自动运行）" to result.line)
+            else history += (s(R.string.autopilot_turn) to result.line)
             if (history.size > 20) history.removeAt(0)
         } catch (e: Exception) {
             _messages.value = _messages.value + UiMsg("ai", s(R.string.toast_model_blank), e.message ?: "")

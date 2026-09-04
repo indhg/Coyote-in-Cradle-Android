@@ -1,4 +1,4 @@
-package com.indhg.aiforcoyote
+﻿package com.indhg.aiforcoyote
 
 import android.Manifest
 import android.content.Intent
@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,7 +24,7 @@ import com.indhg.aiforcoyote.ui.ChatScreen
 import com.indhg.aiforcoyote.ui.SettingsScreen
 import com.indhg.aiforcoyote.ui.theme.CoyoteTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val vm: MainViewModel by viewModels()
 

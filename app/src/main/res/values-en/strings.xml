@@ -14,7 +14,6 @@
     <string name="lang_zh">中文</string>
     <string name="lang_en">English</string>
     <string name="ui_language">UI language</string>
-    <string name="ui_language_note">Menus, buttons, and toasts. Not speech or read-aloud — this app has no TTS.</string>
     <string name="script_language">Script language</string>
     <string name="script_language_note">Only switches the AI character script (Chinese / English markdown). Not the app UI, and not speech — this app has no TTS.</string>
     <string name="script_follow_hint">Scripts currently follow the UI language. Tap a script language below to set it separately.</string>
@@ -63,7 +62,7 @@
     <string name="save_nick">Save name</string>
     <string name="nick_saved">Name saved</string>
     <string name="observe_section">Sensors</string>
-    <string name="cap_section">Intensity cap (default 100, Coyote max 200)</string>
+    <string name="cap_section">Intensity cap (default 100, max cap 200)</string>
     <string name="disclaimer">Adults only, consensual fiction. Do not use with heart conditions or a pacemaker.</string>
     <string name="version_line">Coyote in Cradle v%1$s (build %2$d)</string>
 
@@ -88,7 +87,6 @@
     <string name="dev_pick_list">Tap a device (stronger signal first):</string>
     <string name="dev_unnamed">Unnamed</string>
     <string name="connect_coyote">Connect Coyote</string>
-    <string name="ble_direct_hint">BLE straight to the pulse box. No official App, no relay.</string>
 
     <string name="err_no_bt">No Bluetooth on this phone</string>
     <string name="err_bad_addr">Connect failed: bad address</string>
@@ -114,6 +112,7 @@
     <string name="observing_on">Watching</string>
     <string name="observing_off">Sensors off</string>
     <string name="autopilot">Autopilot</string>
+    <string name="autopilot_turn">(Autopilot)</string>
     <string name="mic_off">Mic off</string>
     <string name="observe_need_perm">Sensors off (grant camera/mic to enable)</string>
     <string name="rage_n">Rage %1$d</string>

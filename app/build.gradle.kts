@@ -1,3 +1,6 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,6 +10,9 @@ plugins {
 
 /** 版本号：阶段标注（如 0.1.0-m1.2），同时写进 APK 文件名 */
 val appVersion = "1.1.7"
+
+/** debug 构建时间戳：yyyyMMdd-HHmm，用于 versionNameSuffix 与 APK 文件名 */
+val buildTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
 
 android {
     namespace = "com.indhg.aiforcoyote"
@@ -21,6 +27,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            versionNameSuffix = "-dev.$buildTimestamp"
+        }
         release {
             isMinifyEnabled = false
             // 自用侧载：release 复用 debug 签名（换正式签名时在此处替换）
@@ -41,12 +50,19 @@ android {
     }
 }
 
-// APK 文件名带版本号：Coyote-in-Cradle-<versionName>-<variant>.apk
+// APK 文件名：
+// debug:   Coyote-in-Cradle-1.1.7-dev.<ts>-debug.apk
+// release: Coyote-in-Cradle-1.1.7-release.apk
 androidComponents {
     onVariants(selector().all()) { variant ->
         variant.outputs.forEach { output ->
+            val fileName = if (variant.buildType == "debug") {
+                "Coyote-in-Cradle-$appVersion-dev.$buildTimestamp-debug.apk"
+            } else {
+                "Coyote-in-Cradle-$appVersion-${variant.name}.apk"
+            }
             (output as com.android.build.api.variant.impl.VariantOutputImpl)
-                .outputFileName.set("Coyote-in-Cradle-$appVersion-${variant.name}.apk")
+                .outputFileName.set(fileName)
         }
     }
 }

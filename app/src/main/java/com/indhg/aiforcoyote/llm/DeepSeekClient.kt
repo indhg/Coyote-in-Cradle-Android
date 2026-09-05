@@ -75,6 +75,7 @@ class DeepSeekClient {
     /**
      * 一轮对话。
      * @param history 历史（用户消息, AI 台词）对，不包含本轮。
+     * @param userText 本轮用户输入；为空时表示自动运行轮次。
      * @param imageB64 本轮注入的摄像头帧（JPEG base64，可空）。
      * @param jsonMode 是否请求 json_object（部分中转站不支持，关闭后程序有兜底解析；400 时也会自动降级重试）。
      */
@@ -86,6 +87,7 @@ class DeepSeekClient {
         history: List<Pair<String, String>>,
         imageB64: String? = null,
         jsonMode: Boolean = true,
+        userText: String? = null,
     ): LlmTurn = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
         var degraded = false // 400 时已自动去掉 response_format 重试过
@@ -93,7 +95,7 @@ class DeepSeekClient {
             val sys = if (round == 1) system else system + ROUND_WARNING
             val temperature = if (round == 1) 1.0 else 0.0
             try {
-                val msgs = buildMessages(sys, history, imageB64)
+                val msgs = buildMessages(sys, history, imageB64, userText)
                 val fields = mutableMapOf<String, JsonElement>(
                     "model" to JsonPrimitive(model),
                     "messages" to msgs,
@@ -154,6 +156,7 @@ class DeepSeekClient {
         system: String,
         history: List<Pair<String, String>>,
         imageB64: String?,
+        userText: String? = null,
     ): JsonArray {
         val list = mutableListOf<JsonObject>()
         list += JsonObject(
@@ -163,17 +166,22 @@ class DeepSeekClient {
             list += JsonObject(mapOf("role" to JsonPrimitive("user"), "content" to JsonPrimitive(user)))
             list += JsonObject(mapOf("role" to JsonPrimitive("assistant"), "content" to JsonPrimitive(assistant)))
         }
-        // 本轮：自动运行轮次注入观察信号；用户消息轮次注入用户文本
+        val currentUserText = userText?.trim()?.takeIf { it.isNotEmpty() }
+        // 本轮：手动输入优先；没有手动输入时才注入自动运行提示。
         val userContent = if (imageB64 != null) {
+            val text = if (currentUserText != null) {
+                "【玩家输入】$currentUserText\n" +
+                    "【画面观察】这是此刻的现场画面。请结合玩家输入和画面里的真实可见内容回应（看不清的部分保留悬念）。"
+            } else {
+                "【画面观察】这是此刻的现场画面。请按画面里的真实可见内容推进剧情（看不清的部分保留悬念）。" +
+                    "【玩家反馈】本轮无语音内容。请主动推进：观察 → 描写（）→ 动作 → 发言。"
+            }
             JsonArray(
                 listOf(
                     JsonObject(
                         mapOf(
                             "type" to JsonPrimitive("text"),
-                            "text" to JsonPrimitive(
-                                "【画面观察】这是此刻的现场画面。请按画面里的真实可见内容推进剧情（看不清的部分保留悬念）。" +
-                                    "【玩家反馈】本轮无语音内容。请主动推进：观察 → 描写（）→ 动作 → 发言。"
-                            ),
+                            "text" to JsonPrimitive(text),
                         )
                     ),
                     JsonObject(
@@ -187,7 +195,7 @@ class DeepSeekClient {
                 )
             )
         } else {
-            JsonPrimitive("【自动运行】请主动推进：观察 → 描写（）→ 动作 → 发言。")
+            JsonPrimitive(currentUserText ?: "【自动运行】请主动推进：观察 → 描写（）→ 动作 → 发言。")
         }
         list += JsonObject(mapOf("role" to JsonPrimitive("user"), "content" to userContent))
         return JsonArray(list)

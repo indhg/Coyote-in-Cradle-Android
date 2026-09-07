@@ -72,8 +72,8 @@ class BleCoyote(
     private class ChState {
         var strength = 0                 // UI 0-200（郊狼满值 200，对齐桌面版）
         var dirty = true                 // 强度待下发
-        var frames: List<String> = emptyList()  // 官方波形帧（8 hex/帧）
-        var idx = 0                      // 流式游标（每 B0 前进 2 帧）
+        var frames: List<String> = emptyList()  // 官方波形帧（16 hex/帧，8 bytes）
+        var idx = 0                      // 流式游标（每 B0 前进 1 帧）
         var untilMs = 0L                 // pulse 结束时间（0 = pulse_hold 无限）
     }
 
@@ -420,34 +420,48 @@ class BleCoyote(
             seq = 1
         }
         out[1] = ((seq shl 4) or mode).toByte()
-        fillChannel(out, 4, 8, isB = false, c = a, now = now)
-        fillChannel(out, 12, 16, isB = true, c = b, now = now)
+        val aHasFrame = fillChannel(out, 4, 8, c = a, now = now)
+        val bHasFrame = fillChannel(out, 12, 16, c = b, now = now)
         val ok = write(out, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
         if (ok) {
             a.dirty = false
             b.dirty = false
+            if (aHasFrame && a.frames.isNotEmpty()) a.idx = (a.idx + 1) % a.frames.size
+            if (bHasFrame && b.frames.isNotEmpty()) b.idx = (b.idx + 1) % b.frames.size
         }
         return ok
     }
 
-    /** 每通道 4 组 (频率,强度) = 2 个波形帧（每帧 2 组）；无效数据（强度 101）→ 设备丢弃该通道。 */
-    private fun fillChannel(out: ByteArray, freqOff: Int, intOff: Int, isB: Boolean, c: ChState, now: Long) {
+    /** 每通道 4 组 (频率,强度) = 一个完整波形帧；无效数据（强度 101）→ 设备丢弃该通道。 */
+    private fun fillChannel(out: ByteArray, freqOff: Int, intOff: Int, c: ChState, now: Long): Boolean {
         val active = c.frames.isNotEmpty() && (c.untilMs == 0L || now < c.untilMs)
         if (!active) {
             for (i in 0 until 4) {
                 out[freqOff + i] = 0
                 out[intOff + i] = 101
             }
-            return
+            return false
         }
-        val base = if (isB) 8 else 0
-        for (j in 0 until 4) {
-            val frame = c.frames[(c.idx + j / 2) % c.frames.size]
-            val cs = base + (j % 2) * 4
-            out[freqOff + j] = frame.substring(cs, cs + 2).toInt(16).toByte()
-            out[intOff + j] = frame.substring(cs + 2, cs + 4).toInt(16).toByte()
+        val frame = c.frames[c.idx % c.frames.size]
+        val bytes = runCatching {
+            require(frame.length == 16)
+            frame.chunked(2).map { it.toInt(16) }
+        }.getOrNull() ?: emptyList()
+        val valid = bytes.size == 8 &&
+            bytes.take(4).all { it in 10..240 } &&
+            bytes.drop(4).all { it in 0..100 }
+        if (valid) {
+            for (i in 0 until 4) {
+                out[freqOff + i] = bytes[i].toByte()
+                out[intOff + i] = bytes[4 + i].toByte()
+            }
+        } else {
+            for (i in 0 until 4) {
+                out[freqOff + i] = 0
+                out[intOff + i] = 101
+            }
         }
-        c.idx = (c.idx + 2) % c.frames.size
+        return true
     }
 
     // ---------- DeviceOps ----------

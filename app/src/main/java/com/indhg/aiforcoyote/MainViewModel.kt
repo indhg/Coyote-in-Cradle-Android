@@ -417,6 +417,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val result = client.chat(
                 s.baseUrl, s.apiKey, s.model, system, history.toList(), img,
                 jsonMode = s.jsonMode,
+                userText = userText,
             )
             val actions = result.actions.map { parseAction(it) }
             val (executed, dropped) = safety.apply(actions)

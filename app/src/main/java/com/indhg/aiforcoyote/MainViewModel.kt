@@ -21,15 +21,32 @@ import com.indhg.aiforcoyote.game.parseAction
 import com.indhg.aiforcoyote.llm.DeepSeekClient
 import com.indhg.aiforcoyote.llm.Roles
 import com.indhg.aiforcoyote.llm.SystemPrompt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 聊天消息（UI 层）。 */
-data class UiMsg(val role: String, val text: String, val note: String = "")
+/** 聊天消息的处理状态（只对用户消息显示，AI 消息固定为 COMPLETE）。 */
+enum class UiMsgStatus {
+    COMPLETE,
+    QUEUED,
+    PROCESSING,
+    FAILED,
+}
+
+/** 聊天消息（UI 层）。id/turnId 用于在排队时把回复插回所属消息下方。 */
+data class UiMsg(
+    val role: String,
+    val text: String,
+    val note: String = "",
+    val id: Long = 0L,
+    val status: UiMsgStatus = UiMsgStatus.COMPLETE,
+    val turnId: Long = id,
+)
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -109,7 +126,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val history = mutableListOf<Pair<String, String>>()
     private var loopJob: Job? = null
 
+    /** 所有模型请求都经过这个单消费者，避免手动消息与自动回合并发。 */
+    private val requestCommands = Channel<QueueCommand>(Channel.UNLIMITED)
+    /** 自动回合完成信号；定时器据此从“回合结束”开始计时。 */
+    private val autopilotCompletions = Channel<Unit>(Channel.CONFLATED)
+    private var requestWorkerJob: Job? = null
+    private var nextMessageId = 1L
+    private var conversationGeneration = 0
+
+    private data class PendingTurn(
+        val generation: Int,
+        val messageId: Long?,
+        val userText: String?,
+    )
+
+    private sealed interface QueueCommand {
+        data class Manual(val turn: PendingTurn) : QueueCommand
+        data class Cancel(val messageId: Long) : QueueCommand
+        data object ClearManual : QueueCommand
+        data object AutopilotTick : QueueCommand
+    }
+
+    private sealed interface TurnOutcome {
+        data class Success(val line: String, val note: String) : TurnOutcome
+        data class Failure(
+            val reason: String,
+            val showInTranscript: Boolean = false,
+        ) : TurnOutcome
+    }
+
     init {
+        requestWorkerJob = viewModelScope.launch { requestWorker() }
         viewModelScope.launch {
             repo.settings.collect { s ->
                 val autopilotChanged = s.autopilot != _settings.value.autopilot
@@ -346,8 +393,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 清空对话历史（界面消息 + 模型上下文）。 */
     fun clearHistory() {
+        conversationGeneration++
         _messages.value = emptyList()
         history.clear()
+        requestCommands.trySend(QueueCommand.ClearManual)
         _toast.value = s(R.string.toast_cleared)
     }
 
@@ -377,20 +426,183 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun send(text: String) {
         val t = text.trim()
         if (t.isEmpty()) return
-        _messages.value = _messages.value + UiMsg("user", t)
-        viewModelScope.launch { turn(userText = t) }
+        val id = nextMessageId++
+        _messages.value = _messages.value + UiMsg(
+            role = "user",
+            text = t,
+            id = id,
+            status = UiMsgStatus.QUEUED,
+            turnId = id,
+        )
+        val command = QueueCommand.Manual(PendingTurn(conversationGeneration, id, t))
+        if (!requestCommands.trySend(command).isSuccess) {
+            updateMessage(id) { it.copy(status = UiMsgStatus.FAILED, note = s(R.string.queue_unavailable)) }
+        }
     }
 
-    private suspend fun turn(userText: String? = null) {
-        if (_busy.value) return
-        _busy.value = true
-        val s = _settings.value
-        try {
-            if (s.apiKey.isBlank()) {
-                _toast.value = s(R.string.toast_need_api)
-                _busy.value = false
-                return
+    /** 重试一条失败的手动消息，沿用原气泡和顺序。 */
+    fun retry(messageId: Long) {
+        val message = _messages.value.firstOrNull {
+            it.id == messageId && it.role == "user" && it.status == UiMsgStatus.FAILED
+        } ?: return
+        updateMessage(messageId) { it.copy(status = UiMsgStatus.QUEUED, note = "") }
+        val command = QueueCommand.Manual(PendingTurn(conversationGeneration, messageId, message.text))
+        if (!requestCommands.trySend(command).isSuccess) {
+            updateMessage(messageId) { it.copy(status = UiMsgStatus.FAILED, note = s(R.string.queue_unavailable)) }
+        }
+    }
+
+    /** 从等待队列移除一条消息（当前正在处理的消息不会出现在可取消列表中）。 */
+    fun cancelQueued(messageId: Long) {
+        val queued = _messages.value.any {
+            it.id == messageId && it.role == "user" && it.status == UiMsgStatus.QUEUED
+        }
+        if (!queued) return
+        _messages.value = _messages.value.filterNot { it.id == messageId }
+        requestCommands.trySend(QueueCommand.Cancel(messageId))
+    }
+
+    /** 清空所有尚未发送的手动消息；当前正在处理的回合继续完成。 */
+    fun clearQueued() {
+        if (_messages.value.none { it.role == "user" && it.status == UiMsgStatus.QUEUED }) return
+        _messages.value = _messages.value.filterNot {
+            it.role == "user" && it.status == UiMsgStatus.QUEUED
+        }
+        requestCommands.trySend(QueueCommand.ClearManual)
+    }
+
+    private fun updateMessage(id: Long, transform: (UiMsg) -> UiMsg) {
+        _messages.value = _messages.value.map { if (it.id == id) transform(it) else it }
+    }
+
+    private fun appendAssistant(turnId: Long?, line: String, note: String) {
+        val id = nextMessageId++
+        val message = UiMsg(
+            role = "ai",
+            text = line,
+            note = note,
+            id = id,
+            status = UiMsgStatus.COMPLETE,
+            turnId = turnId ?: id,
+        )
+        if (turnId == null) {
+            _messages.value = _messages.value + message
+            return
+        }
+        val list = _messages.value.toMutableList()
+        val index = list.indexOfFirst { it.id == turnId }
+        if (index >= 0) list.add(index + 1, message) else list += message
+        _messages.value = list
+    }
+
+    /** 单消费者：手动队列始终先于待处理的 autopilot 回合。 */
+    private suspend fun requestWorker() {
+        val manualQueue = java.util.ArrayDeque<PendingTurn>()
+        var autopilotPending = false
+
+        fun accept(command: QueueCommand) {
+            when (command) {
+                is QueueCommand.Manual -> {
+                    if (command.turn.generation == conversationGeneration) manualQueue.addLast(command.turn)
+                }
+                is QueueCommand.Cancel -> {
+                    val iterator = manualQueue.iterator()
+                    while (iterator.hasNext()) {
+                        if (iterator.next().messageId == command.messageId) iterator.remove()
+                    }
+                }
+                QueueCommand.ClearManual -> manualQueue.clear()
+                QueueCommand.AutopilotTick -> autopilotPending = true
             }
+        }
+
+        fun drainCommands() {
+            while (true) {
+                val result = requestCommands.tryReceive()
+                if (!result.isSuccess) break
+                accept(result.getOrThrow())
+            }
+        }
+
+        while (true) {
+            // receiveCatching 让 onCleared 关闭 channel 时 worker 正常退出，
+            // 不把 ClosedReceiveChannelException 当成一次模型失败。
+            val first = requestCommands.receiveCatching().getOrNull() ?: return
+            accept(first)
+            drainCommands()
+            while (true) {
+                drainCommands()
+                var skippedAutopilot = false
+                val pending = when {
+                    manualQueue.isNotEmpty() -> manualQueue.removeFirst()
+                    autopilotPending -> {
+                        autopilotPending = false
+                        if (autopilotEnabled()) {
+                            PendingTurn(conversationGeneration, null, null)
+                        } else {
+                            skippedAutopilot = true
+                            null
+                        }
+                    }
+                    else -> null
+                }
+                if (pending == null) {
+                    // 即使自动运行当前不可用，也让调度器继续计时，便于 API Key
+                    // 在运行期间补填后自动恢复，而不是永久停在等待状态。
+                    if (skippedAutopilot) autopilotCompletions.trySend(Unit)
+                    break
+                }
+
+                if (pending.generation != conversationGeneration) continue
+                pending.messageId?.let { id -> updateMessage(id) { it.copy(status = UiMsgStatus.PROCESSING, note = "") } }
+                _busy.value = true
+                try {
+                    val outcome = executeTurn(pending.userText)
+                    // 让 busy 覆盖“模型返回 → 回复插入对应气泡”的整个原子段，
+                    // 避免输入区短暂显示空闲却尚未出现回复。
+                    handleOutcome(pending, outcome)
+                } catch (e: CancellationException) {
+                    throw e
+                } finally {
+                    _busy.value = false
+                    if (pending.messageId == null) autopilotCompletions.trySend(Unit)
+                }
+            }
+        }
+    }
+
+    private fun autopilotEnabled(): Boolean {
+        val current = _settings.value
+        return current.autopilot && current.apiKey.isNotBlank()
+    }
+
+    private fun handleOutcome(pending: PendingTurn, outcome: TurnOutcome) {
+        if (pending.generation != conversationGeneration) return
+        when (outcome) {
+            is TurnOutcome.Success -> {
+                pending.messageId?.let { id -> updateMessage(id) { it.copy(status = UiMsgStatus.COMPLETE, note = "") } }
+                appendAssistant(pending.messageId, outcome.line, outcome.note)
+                val user = pending.userText ?: s(R.string.autopilot_turn)
+                history += user to outcome.line
+                if (history.size > 20) history.removeAt(0)
+            }
+            is TurnOutcome.Failure -> {
+                if (pending.messageId != null) {
+                    updateMessage(pending.messageId) { it.copy(status = UiMsgStatus.FAILED, note = outcome.reason) }
+                } else if (outcome.showInTranscript) {
+                    appendAssistant(null, s(R.string.toast_model_blank), outcome.reason)
+                }
+            }
+        }
+    }
+
+    private suspend fun executeTurn(userText: String?): TurnOutcome {
+        val s = _settings.value
+        if (s.apiKey.isBlank()) {
+            if (userText != null) _toast.value = s(R.string.toast_need_api)
+            return TurnOutcome.Failure(s(R.string.toast_need_api))
+        }
+        return try {
             // M2：观察信号——怒气值（画面黑暗 / 持续无声）+ 最新帧注入 + 呻吟反馈
             val cs = camera.state.value
             val asSt = audio.state.value
@@ -401,10 +613,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _rage.value = rageRounds
             val img = if (cs.enabled && cs.hasFrame) camera.base64() else null
             if (!roleUsable(s.role)) {
-                _toast.value = s(R.string.toast_role_fallback, UiLabels.role(getApplication(), s.role))
+                val role = UiLabels.role(getApplication(), s.role)
+                _toast.value = s(R.string.toast_role_fallback, role)
                 updateSettings { it.copy(role = "体验版") }
-                _busy.value = false
-                return
+                return TurnOutcome.Failure(s(R.string.toast_role_fallback, role))
             }
             val system = SystemPrompt.build(
                 getApplication(), s.role, s.nick,
@@ -417,6 +629,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val result = client.chat(
                 s.baseUrl, s.apiKey, s.model, system, history.toList(), img,
                 jsonMode = s.jsonMode,
+                userText = userText,
             )
             val actions = result.actions.map { parseAction(it) }
             val (executed, dropped) = safety.apply(actions)
@@ -433,14 +646,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 for (e in executed) append("▶ ").append(e.label).append("\n")
                 for (d in dropped) append("✖ ").append(d.reason).append("\n")
             }.trimEnd()
-            _messages.value = _messages.value + UiMsg("ai", result.line, note)
-            if (userText != null) history += (userText to result.line)
-            else history += (s(R.string.autopilot_turn) to result.line)
-            if (history.size > 20) history.removeAt(0)
+            TurnOutcome.Success(result.line, note)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            _messages.value = _messages.value + UiMsg("ai", s(R.string.toast_model_blank), e.message ?: "")
-        } finally {
-            _busy.value = false
+            TurnOutcome.Failure(
+                e.message?.trim()?.takeIf { it.isNotEmpty() } ?: s(R.string.toast_model_blank),
+                showInTranscript = true,
+            )
         }
     }
 
@@ -485,12 +698,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun restartLoop() {
         loopJob?.cancel()
         loopJob = viewModelScope.launch {
+            // 丢弃旧调度器遗留的完成信号，避免切换开关后立刻重复触发。
+            while (autopilotCompletions.tryReceive().isSuccess) { }
+            // 首轮立即尝试；后续由 worker 合并 tick，避免请求进行中堆积 autopilot 回合。
+            requestCommands.trySend(QueueCommand.AutopilotTick)
             while (true) {
-                val s = _settings.value
-                if (s.autopilot && s.apiKey.isNotBlank() && !_busy.value) {
-                    turn()
-                }
+                // 保持原有节奏：上一轮（包括模型返回和动作处理）结束后再等 12 秒。
+                // 手动队列仍由 worker 优先处理；等待期间到达的 tick 只会合并成一轮。
+                if (autopilotCompletions.receiveCatching().getOrNull() == null) return@launch
                 delay(12_000L)
+                requestCommands.trySend(QueueCommand.AutopilotTick)
             }
         }
     }
@@ -498,6 +715,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** 急停不做；复位供断开场景调用。 */
     fun resetDevice() {
         viewModelScope.launch { safety.reset() }
+    }
+
+    override fun onCleared() {
+        loopJob?.cancel()
+        requestWorkerJob?.cancel()
+        requestCommands.close()
+        autopilotCompletions.close()
+        super.onCleared()
     }
 
     companion object {
